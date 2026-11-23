@@ -1,0 +1,25 @@
+{
+  "id": "edzco_popbang",
+  "title": "Pop-Bang",
+  "description": "Hold the button, the exhaust valve opens. Release, it closes. The service closes it after 3 s of held-open regardless. Works only when parked and the engine is on. Needs the Exhaust tool (the Store installs it with the app). You fill in your DME's DID and payload in the tool's config before using it; without that, it refuses to write.",
+  "version": "0.1.0",
+  "vendor": "edzco",
+  "loggingId": "OAEDZ1",
+  "iconGlyph": "exhaust",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": {
+    "edzco-exhaust": "0.1.0",
+    "mgu-deploy": "0.7.5"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "_notes": "parking state + engine state live here; the app forwards both to the tool with every hold op so the tool can enforce safety on its side too",
+      "statusGearPosition": "rs",
+      "statusEngineRunning": "rs",
+      "statusCarSpeed": "rs"
+    },
+    "de.bmw.infotainment.telematic.oap.AppStart": {
+      "statusApplicationStarted": "rs"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "apps": {
+    "path": "apps/*",
+    "manifest": "app.json",
+    "icon": "icon.png",
+    "exclude": ["_template", "wip"],
+    "mguHmi": ["ID7", "ID8"]
+  },
+  "tools": {
+    "path": "tools/*",
+    "manifest": "component.json"
+  }
+}

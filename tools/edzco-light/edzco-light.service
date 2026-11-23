@@ -1,0 +1,25 @@
+[Unit]
+Description=EDZCO interior ambient light service (M Scenes)
+Documentation=file:/opt/edzco-light/README.md
+After=network.target hmictl.service
+Wants=hmictl.service
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /opt/edzco-light/light.js
+WorkingDirectory=/opt/edzco-light
+Restart=on-failure
+RestartSec=3
+
+# the tool holds no secrets
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/run/edzco-light /var/log/edzco-light
+RuntimeDirectory=edzco-light
+RuntimeDirectoryMode=0755
+LogsDirectory=edzco-light
+LogsDirectoryMode=0755
+
+[Install]
+WantedBy=multi-user.target

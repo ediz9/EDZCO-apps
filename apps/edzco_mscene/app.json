@@ -1,0 +1,25 @@
+{
+  "id": "edzco_mscene",
+  "title": "M Scenes",
+  "description": "Choreographed interior ambient light scenes. Welcome lights the cabin corner to corner when a door opens; M Mode runs the M tricolour (blue -> dark blue -> red) chasing the dash on each side; Celebration sweeps rainbow waves across every zone for half a minute; Sunset fades from warm amber under the dash up to cool magenta on the roof; Night Drive settles on a dim, warm backlight. Each scene drives every lit zone the car has (dash, doors, footwell, console, seats, roof) through the BDC's workshop jobs INNENLICHT_FI_LIN_1_LAYERING / _LIN_2_LAYERING. Nothing is persisted on the car's own coding - every write lasts at most 254 s and the car takes over again by itself. Needs the Light tool (the Store installs it with the app).",
+  "version": "0.1.0",
+  "vendor": "edzco",
+  "loggingId": "OAEDZ2",
+  "iconGlyph": "scene",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": {
+    "edzco-light": "0.1.0",
+    "mgu-deploy": "0.7.5"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "_notes": "Welcome scene listens to door events and ignition state; Night Drive looks at ambient light for auto-dim",
+      "statusDoorDriverFront": "rs",
+      "statusDoorPassengerFront": "rs",
+      "statusDoorDriverRear": "rs",
+      "statusDoorPassengerRear": "rs",
+      "statusIgnition": "rs",
+      "statusGearPosition": "rs"
+    }
+  }
+}

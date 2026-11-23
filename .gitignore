@@ -1,0 +1,23 @@
+# build output
+dist/
+*.tgz
+
+# node
+node_modules/
+npm-debug.log
+package-lock.json
+
+# editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# python
+__pycache__/
+*.pyc
+
+# runtime data (device-specific)
+data/
+*.sock

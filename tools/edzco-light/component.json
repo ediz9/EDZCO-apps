@@ -1,0 +1,27 @@
+{
+  "id": "edzco-light",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "Light",
+  "description": "The service behind M Scenes. Writes the BDC's interior-ambient workshop jobs (INNENLICHT_FI_LIN_1_LAYERING / _FI_LIN_2_LAYERING, SID 2E, DIDs DA5E and E3D1) through the head unit's diagnostic gateway (TASU) via hmictl. Exposes a JSON-line control socket at /run/edzco-light/ctl.sock. Each write lasts up to 254 s on the car; the tool renews every 120 s while a scene is active and stops by itself when the app disconnects or asks for Stop. Nothing on the car's own coding is changed - the colours disappear 254 s after the last renewal and the car's own ambient takes over again.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": ["ID7", "ID8"],
+  "requires": {
+    "mgu-deploy": "0.7.11"
+  },
+  "files": [
+    { "path": "light.js",    "from": "light.js",    "mode": "0644" },
+    { "path": "uds.js",      "from": "uds.js",      "mode": "0644" },
+    { "path": "zones.js",    "from": "zones.js",    "mode": "0644" },
+    { "path": "README.md",   "from": "README.md",   "mode": "0644" }
+  ],
+  "units": [
+    { "name": "edzco-light.service", "from": "edzco-light.service" }
+  ],
+  "enable": [
+    { "unit": "edzco-light.service", "target": "multi-user.target" }
+  ],
+  "recmgr": ["edzco-light"],
+  "restart": ["edzco-light.service"]
+}
