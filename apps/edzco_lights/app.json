@@ -1,0 +1,26 @@
+{
+  "id": "edzco_lights",
+  "title": "Lights",
+  "description": "Flashes the exterior lamps in patterns through the body controller's own test functions - Welcome and Goodbye around door open and lock, Comfort Flash as an acknowledgement, Sequential Chase and Hazard Dance parked only, plus a Freeform tab with every lamp as a toggle. Includes a Lamp Check routine that learns which path works on each lamp of your car (BDC output, headlight module function or BDC function). Needs the Exterior Lights tool (the Store installs it with the app).",
+  "version": "0.1.0",
+  "vendor": "edzco",
+  "loggingId": "OAEDZ2",
+  "iconGlyph": "lights",
+  "mguHmi": ["ID7", "ID8"],
+  "requires": {
+    "edzco-lights": "0.1.0",
+    "mgu-deploy": "0.7.5"
+  },
+  "signals": {
+    "de.bmw.infotainment.vehicle.CDS": {
+      "_notes": "doors + gear + ignition drive the auto patterns and the parkedOnly gate",
+      "statusDoorDriverFront": "rs",
+      "statusDoorPassengerFront": "rs",
+      "statusDoorDriverRear": "rs",
+      "statusDoorPassengerRear": "rs",
+      "statusGearPosition": "rs",
+      "statusIgnition": "rs",
+      "statusCentralLock": "rs"
+    }
+  }
+}

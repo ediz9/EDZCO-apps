@@ -1,0 +1,26 @@
+{
+  "id": "edzco-lights",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "Exterior Lights",
+  "description": "The service behind the Lights app. Flashes the car's exterior lamps in patterns through BMW's own test functions on the body controller (BDC, 0x40) and the LED headlight modules (FLM, 0x43 / 0x44). Exposes a JSON-line control socket at /run/edzco-lights/ctl.sock. Safety: every write is time-limited at the ECU; parked-only and danger-only patterns are refused without explicit flags from the app. The lamp check routine learns the body controller's output layout and the per-lamp route (BDC output, FLM function, BDC function) so patterns pick the first path that works on this car.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "mgu-deploy": "0.7.11" },
+  "files": [
+    { "path": "lights.js",   "from": "lights.js",   "mode": "0644" },
+    { "path": "uds.js",      "from": "uds.js",      "mode": "0644" },
+    { "path": "lamps.js",    "from": "lamps.js",    "mode": "0644" },
+    { "path": "patterns.js", "from": "patterns.js", "mode": "0644" },
+    { "path": "README.md",   "from": "README.md",   "mode": "0644" }
+  ],
+  "units": [
+    { "name": "edzco-lights.service", "from": "edzco-lights.service" }
+  ],
+  "enable": [
+    { "unit": "edzco-lights.service", "target": "multi-user.target" }
+  ],
+  "recmgr": ["edzco-lights"],
+  "restart": ["edzco-lights.service"]
+}

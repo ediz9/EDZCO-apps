@@ -1,6 +1,6 @@
 'use strict';
 /*
- * uds.js - edzco-light: UDS through the head unit's diagnostic gateway (TASU, SOME/IP 0xF8A6 instance 128),
+ * uds.js - edzco-lights: UDS through the head unit's diagnostic gateway (TASU, SOME/IP 0xF8A6 instance 128),
  * over one `hmictl serve` session. This is the same mechanism iteriodev-comfort uses (car-tested on mgu-m4
  * 2026-11-07); the method is `sendTasuRequest` with sourceAddress F2, target (the ECU byte), service id, subroutine 0.
  *

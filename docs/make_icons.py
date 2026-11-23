@@ -111,29 +111,32 @@ def popbang_icon(path):
     print(f"wrote {path}")
 
 
-def mscene_icon(path):
-    """A radial halo (ambient lights) + M stripe. Warm ring with cool centre."""
+def lights_icon(path):
+    """Two BMW-style quad headlights (angel eyes) casting beams. + M stripe + EDZ wordmark."""
     img = rounded_square(SIZE, BG, EDGE, CORNER)
     d = ImageDraw.Draw(img)
-    cx, cy = 64, 56
 
-    # outer halo (warm amber -> magenta fade) built from concentric rings with
-    # decreasing alpha, then blurred for softness
-    halo = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    hd = ImageDraw.Draw(halo)
-    for i, (r, c) in enumerate([(32, (255, 157, 0, 70)),
-                                 (26, (255, 100, 60, 110)),
-                                 (20, (225, 0, 26, 150)),
-                                 (14, (176, 80, 220, 180))]):
-        hd.ellipse([cx - r, cy - r, cx + r, cy + r], fill=c)
-    halo = halo.filter(ImageFilter.GaussianBlur(2))
-    img.alpha_composite(halo)
+    # beams (soft cones from each lamp, blurred)
+    beams = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
+    bd = ImageDraw.Draw(beams)
+    # left beam cone
+    bd.polygon([(34, 56), (6, 76), (6, 44)], fill=(255, 220, 160, 90))
+    # right beam cone
+    bd.polygon([(94, 56), (122, 76), (122, 44)], fill=(255, 220, 160, 90))
+    beams = beams.filter(ImageFilter.GaussianBlur(3))
+    img.alpha_composite(beams)
 
-    # cold white centre dot
-    d.ellipse([cx - 5, cy - 5, cx + 5, cy + 5], fill=(240, 246, 255))
-
-    # outer thin ring to give definition
-    d.ellipse([cx - 34, cy - 34, cx + 34, cy + 34], outline=(80, 90, 110), width=1)
+    # two angel-eye rings (left + right lamps)
+    for cx in (34, 94):
+        # outer ring (cool white)
+        d.ellipse([cx - 14, 56 - 14, cx + 14, 56 + 14],
+                  outline=(235, 242, 255), width=3)
+        # inner lamp body
+        d.ellipse([cx - 9, 56 - 9, cx + 9, 56 + 9],
+                  fill=(255, 231, 173))
+        # hot centre
+        d.ellipse([cx - 4, 56 - 4, cx + 4, 56 + 4],
+                  fill=(255, 255, 240))
 
     # M stripe along the bottom
     m_stripes(img, 20, 100, 88, 12)
@@ -145,7 +148,7 @@ def mscene_icon(path):
 
 def main():
     popbang_icon(ROOT / "apps" / "edzco_popbang" / "icon.png")
-    mscene_icon(ROOT / "apps" / "edzco_mscene" / "icon.png")
+    lights_icon(ROOT / "apps" / "edzco_lights" / "icon.png")
 
 
 if __name__ == "__main__":
