@@ -426,6 +426,104 @@ def lamp_glow(img, screen, depth, zbuf, tris, mats, which, rgb, width, height, s
     return img
 
 
+# ---------------------------------------------------------------- lamp anchors
+def lamp_anchors(meta, V, F, M):
+    """Work out a 3D point for every lamp the apps address, so the previews can place
+    their dots on the render instead of eyeballing them off a screenshot.
+
+    Anchors that exist as geometry (headlights, tail lights, exhaust tips) are the
+    centroid of that material's triangles on that side, optionally biased up/down or
+    in/out to separate the functions that share one housing - a BMW headlight carries
+    both the DRL and the indicator, a tail light both the indicator and the reversing
+    lamp. The front fogs are not modelled as their own material, so they get a point in
+    the lower bumper directly under each headlight.
+    """
+    cent = V[F].mean(axis=1)
+
+    def cluster(materials, side=None):
+        sel = np.isin(M, materials)
+        if side is not None:
+            sel &= (cent[:, 1] > 0) if side > 0 else (cent[:, 1] < 0)
+        pts = cent[sel]
+        if not len(pts):
+            return None
+        return pts
+
+    def blend(pts, z_frac=0.5, x_frac=0.5, y_frac=0.5):
+        """Pick a point inside a cluster's bounds: 0 = min, 1 = max on each axis, with
+        the cluster's own centroid as the base so the point stays on the part."""
+        lo, hi = pts.min(axis=0), pts.max(axis=0)
+        return np.array([
+            lo[0] + (hi[0] - lo[0]) * x_frac,
+            lo[1] + (hi[1] - lo[1]) * y_frac,
+            lo[2] + (hi[2] - lo[2]) * z_frac,
+        ])
+
+    head_l = cluster([MAT["HEAD"], MAT["LENS"]], side=+1)
+    head_r = cluster([MAT["HEAD"], MAT["LENS"]], side=-1)
+    tail_l = cluster([MAT["TAIL"], MAT["TAILLENS"]], side=+1)
+    tail_r = cluster([MAT["TAIL"], MAT["TAILLENS"]], side=-1)
+    pipe_l = cluster([MAT["CHROME"]], side=+1)
+    pipe_r = cluster([MAT["CHROME"]], side=-1)
+
+    out = {}
+    if head_l is not None:
+        # DRL sits along the top of the housing, the indicator lower and outboard
+        out["drl_l"] = blend(head_l, z_frac=0.82, x_frac=0.60, y_frac=0.55)
+        out["turn_fl"] = blend(head_l, z_frac=0.25, x_frac=0.55, y_frac=0.85)
+        # front fog: under the headlight, in the lower bumper (not its own material)
+        fl = blend(head_l, z_frac=0.5, x_frac=0.75, y_frac=0.70)
+        out["fog_front_l"] = np.array([fl[0] - 0.08, fl[1] * 0.92, 0.40])
+    if head_r is not None:
+        out["drl_r"] = blend(head_r, z_frac=0.82, x_frac=0.60, y_frac=0.45)
+        out["turn_fr"] = blend(head_r, z_frac=0.25, x_frac=0.55, y_frac=0.15)
+        fr = blend(head_r, z_frac=0.5, x_frac=0.75, y_frac=0.30)
+        out["fog_front_r"] = np.array([fr[0] - 0.08, fr[1] * 0.92, 0.40])
+    if tail_l is not None:
+        out["turn_rl"] = blend(tail_l, z_frac=0.60, x_frac=0.45, y_frac=0.85)
+        out["reverse_l"] = blend(tail_l, z_frac=0.30, x_frac=0.55, y_frac=0.25)
+    if tail_r is not None:
+        out["turn_rr"] = blend(tail_r, z_frac=0.60, x_frac=0.45, y_frac=0.15)
+        out["reverse_r"] = blend(tail_r, z_frac=0.30, x_frac=0.55, y_frac=0.75)
+    if tail_l is not None and tail_r is not None:
+        # rear fog: low and inboard, under the bumper between the tail lights
+        lo = np.minimum(tail_l.min(axis=0), tail_r.min(axis=0))
+        out["fog_rear"] = np.array([lo[0] - 0.05, -0.30, 0.42])
+    if pipe_l is not None:
+        out["exhaust_l"] = pipe_l.mean(axis=0)
+    if pipe_r is not None:
+        out["exhaust_r"] = pipe_r.mean(axis=0)
+    return out
+
+
+def project_anchors(anchors, view, fov, width, height, zbuf=None, depth_bias=1.06):
+    """Project each anchor to a percentage of the output frame. `visible` says whether the
+    z-buffer agrees the point is on a surface facing us (used to grey out lamps that are
+    on the far side of the car at this angle)."""
+    if not anchors:
+        return {}
+    ids = list(anchors)
+    pts = np.array([anchors[k] for k in ids], dtype=np.float64)
+    screen, depth, _ = project(pts, view, fov, width, height)
+
+    out = {}
+    for i, k in enumerate(ids):
+        x, y = screen[i]
+        d = depth[i]
+        visible = d > 0
+        if visible and zbuf is not None:
+            ix = int(np.clip(round(x), 0, width - 1))
+            iy = int(np.clip(round(y), 0, height - 1))
+            zb = zbuf[iy, ix]
+            visible = (not np.isfinite(zb)) or (d <= zb * depth_bias + 0.05)
+        out[k] = {
+            "x": round(float(x) / width * 100.0, 2),
+            "y": round(float(y) / height * 100.0, 2),
+            "visible": bool(visible),
+        }
+    return out
+
+
 # ---------------------------------------------------------------- compose
 def render(view_name, azimuth, elevation, distance, fov=26.0, out_size=(1000, 620),
            supersample=3, lamps="head", target_shift=(0.0, 0.0, 0.0)):
@@ -495,19 +593,38 @@ def render(view_name, azimuth, elevation, distance, fov=26.0, out_size=(1000, 62
 
     PREVIEW_DIR.mkdir(parents=True, exist_ok=True)
     (PREVIEW_DIR / out.name).write_bytes(out.read_bytes())
-    return out
+
+    # lamp anchors for this exact camera, as percentages of the frame
+    meta_m, Vm, _Nm, Fm, Mm = load_sedan()
+    shell_end = int(meta_m["intStart"])
+    anchors = lamp_anchors(meta_m, Vm, Fm[:shell_end], Mm[:shell_end])
+    placed = project_anchors(anchors, view, fov, width, height, zbuf)
+    return out, placed
 
 
 def main():
+    views = {}
+
     # Lights: look at the nose from the driver's front corner - headlights, DRL strip,
     # the kidney grille and the front fogs all face the camera. A low elevation keeps the
     # face of the car toward the viewer instead of showing mostly bonnet.
-    render("front", azimuth=34.0, elevation=8.0, distance=8.4, fov=27.0, lamps="head")
+    _, views["front"] = render("front", azimuth=34.0, elevation=8.0, distance=8.4,
+                               fov=27.0, lamps="head")
 
     # Pop-Bang: swing behind to the other corner - the rear bumper, diffuser and the
     # exhaust tips are the subject, with the tail lights lit. Slightly lower still, so the
     # quad tips sit on the silhouette rather than under it.
-    render("rear", azimuth=212.0, elevation=7.0, distance=8.4, fov=27.0, lamps="tail")
+    _, views["rear"] = render("rear", azimuth=212.0, elevation=7.0, distance=8.4,
+                              fov=27.0, lamps="tail")
+
+    out = HERE / "car-lamps.json"
+    out.write_text(json.dumps(views, indent=2), encoding="utf-8")
+    print(f"wrote {out.name}")
+    for view, lamps in views.items():
+        print(f"\n  {view}:")
+        for lid, p in sorted(lamps.items()):
+            mark = " " if p["visible"] else " (hidden)"
+            print(f"    {lid:<14} left:{p['x']:6.2f}%  top:{p['y']:6.2f}%{mark}")
 
 
 if __name__ == "__main__":

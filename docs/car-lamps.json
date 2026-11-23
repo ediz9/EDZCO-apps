@@ -1,0 +1,136 @@
+{
+  "front": {
+    "drl_l": {
+      "x": 32.45,
+      "y": 58.29,
+      "visible": true
+    },
+    "turn_fl": {
+      "x": 36.61,
+      "y": 61.38,
+      "visible": true
+    },
+    "fog_front_l": {
+      "x": 33.83,
+      "y": 68.43,
+      "visible": true
+    },
+    "drl_r": {
+      "x": 19.19,
+      "y": 55.46,
+      "visible": true
+    },
+    "turn_fr": {
+      "x": 16.45,
+      "y": 56.83,
+      "visible": true
+    },
+    "fog_front_r": {
+      "x": 18.53,
+      "y": 64.32,
+      "visible": true
+    },
+    "turn_rl": {
+      "x": 73.28,
+      "y": 42.01,
+      "visible": true
+    },
+    "reverse_l": {
+      "x": 69.83,
+      "y": 42.37,
+      "visible": false
+    },
+    "turn_rr": {
+      "x": 57.19,
+      "y": 40.43,
+      "visible": false
+    },
+    "reverse_r": {
+      "x": 59.78,
+      "y": 41.35,
+      "visible": false
+    },
+    "fog_rear": {
+      "x": 62.86,
+      "y": 49.04,
+      "visible": false
+    },
+    "exhaust_l": {
+      "x": 69.78,
+      "y": 52.24,
+      "visible": false
+    },
+    "exhaust_r": {
+      "x": 62.83,
+      "y": 51.22,
+      "visible": false
+    }
+  },
+  "rear": {
+    "drl_l": {
+      "x": 59.63,
+      "y": 44.03,
+      "visible": false
+    },
+    "turn_fl": {
+      "x": 56.87,
+      "y": 45.25,
+      "visible": false
+    },
+    "fog_front_l": {
+      "x": 58.74,
+      "y": 49.98,
+      "visible": false
+    },
+    "drl_r": {
+      "x": 70.26,
+      "y": 44.98,
+      "visible": false
+    },
+    "turn_fr": {
+      "x": 73.07,
+      "y": 46.81,
+      "visible": true
+    },
+    "fog_front_r": {
+      "x": 71.03,
+      "y": 51.42,
+      "visible": false
+    },
+    "turn_rl": {
+      "x": 18.59,
+      "y": 49.51,
+      "visible": true
+    },
+    "reverse_l": {
+      "x": 22.72,
+      "y": 50.75,
+      "visible": true
+    },
+    "turn_rr": {
+      "x": 39.49,
+      "y": 52.47,
+      "visible": true
+    },
+    "reverse_r": {
+      "x": 35.7,
+      "y": 52.64,
+      "visible": true
+    },
+    "fog_rear": {
+      "x": 30.15,
+      "y": 66.51,
+      "visible": true
+    },
+    "exhaust_l": {
+      "x": 20.87,
+      "y": 68.07,
+      "visible": true
+    },
+    "exhaust_r": {
+      "x": 30.12,
+      "y": 70.33,
+      "visible": true
+    }
+  }
+}
