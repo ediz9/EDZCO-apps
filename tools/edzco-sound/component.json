@@ -1,21 +1,27 @@
 {
   "id": "edzco-sound",
   "kind": "tool",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "title": "Sound",
-  "description": "The service behind Pop-Bang. Plays short overrun effects into the head unit's CarLifeMedia PCM (plug:smartx:CarLifeMedia_CF_48_STEREO, 48 kHz stereo), which the app routes to the main speaker through the GENIVI AudioManager. Runs as root because an OAP app has no access to the audio devices. Ships twenty effects (ten synthesised, ten recorded) and a probe command that reports what this head unit actually has for audio.",
+  "description": "The service behind Pop-Bang. Plays short overrun effects into the head unit's CarLifeMedia PCM (plug:smartx:CarLifeMedia_CF_48_STEREO, 48 kHz stereo) through libasound, as moonride does, with the Store's own Python; the app routes that source to the main speaker through the GENIVI AudioManager. Runs as root because an OAP app has no access to the audio devices. Ships twenty effects (ten synthesised, ten recorded) and a probe command that reports what this head unit actually has for audio.",
   "optional": true,
   "uninstallable": true,
   "mguHmi": [
     "ID7"
   ],
   "requires": {
-    "mgu-deploy": "0.7.11"
+    "mgu-deploy": "0.7.11",
+    "mgu-python": "1.0.2"
   },
   "files": [
     {
       "path": "sound.js",
       "from": "sound.js",
+      "mode": "0644"
+    },
+    {
+      "path": "pcm.py",
+      "from": "pcm.py",
       "mode": "0644"
     },
     {

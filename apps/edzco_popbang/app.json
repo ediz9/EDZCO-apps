@@ -1,8 +1,8 @@
 {
   "id": "edzco_popbang",
   "title": "Pop-Bang",
-  "description": "Plays an overrun effect through the car's speakers the moment you lift off after a rev - when a real exhaust crackles. Watches engine speed and fires on the lift, picking a harder effect the higher the revs were and the faster they fall. Ten effects, from a couple of ticks to a bang with a tail. Nothing is written to the engine: no valve is moved, no coding changes, the exhaust does exactly what it always does. Needs the Sound tool (the Store installs it with the app).",
-  "version": "0.2.0",
+  "description": "Plays an overrun effect through the car's speakers the moment you lift off after a rev - when a real exhaust crackles. Watches engine speed and fires on the lift, picking a harder effect the higher the revs were and the faster they fall. Twenty effects, from a couple of ticks to a bang with a tail. While it plays, the car's media pauses, as for a navigation prompt. Nothing is written to the engine: no valve is moved, no coding changes, the exhaust does exactly what it always does. Needs the Sound tool (the Store installs it with the app).",
+  "version": "0.3.0",
   "vendor": "edzco",
   "loggingId": "OAE1",
   "iconGlyph": "exhaust",
@@ -10,7 +10,7 @@
     "ID7"
   ],
   "requires": {
-    "edzco-sound": "0.1.0"
+    "edzco-sound": "0.2.0"
   },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
@@ -158,6 +158,12 @@
           "Cekise gore"
         ]
       ]
+    },
+    {
+      "key": "prewarm",
+      "label": "Rotayi erken ac (efekt zamaninda, muzik daha uzun susar)",
+      "type": "bool",
+      "default": true
     },
     {
       "key": "parkedOnly",

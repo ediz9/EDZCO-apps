@@ -44,8 +44,9 @@ const AM_IFACE = 'org.genivi.am.commandinterface.CommandControl';
 const AMR_IFACE = 'org.genivi.am.routinginterface.RoutingControlObserver';
 const AM_SRC = 287;      // SmartX CarLifeMedia
 const AM_SINK = 1024;    // main speaker
-const ROUTE_LINGER_MS = 1200;   // hold the route briefly, so a quick second lift does not
-                                // pay the connect cost again
+const ROUTE_LINGER_MS = 4000;   // hold the route after a sound, so a quick second lift does
+                                // not pay the connect cost again
+const PREWARM_RETRY_MS = 5000;  // a route that would not come up is not retried on every rpm sample
 
 /* ------------------------------------------------------------------ detector */
 /**
@@ -168,49 +169,111 @@ function Ctl(log) {
 }
 
 /* ------------------------------------------------------------- AudioManager */
-function CarAudio(signals, log) {
-    const st = { cmd: null, routing: null, id: null, up: false, q: Promise.resolve(), swept: false };
+/*
+ * moonride's sequence (apps/jap_moonride/main.js, car-tested): proxies waited for until their
+ * provider is there (a fresh proxy answers "Service unavailable" before that), leftovers swept,
+ * 287 marked available, connect, and the connection is CS_CONNECTED "in < 1 s". The sound
+ * goes out only once it is: before that smartx takes no PCM from the source.
+ */
+const CONNECTED_WAIT_MS = 2500;
+
+function connectionsOf(r) {
+    if (Array.isArray(r)) return r;
+    if (r && Array.isArray(r.listConnections)) return r.listConnections;
+    return (r && Object.values(r).find(Array.isArray)) || [];
+}
+const isConnected = (c) => c && (c.connectionState === 'CS_CONNECTED' || c.connectionState === 2);
+
+function CarAudio(signals, log, onChange) {
+    const st = { cmd: null, routing: null, id: null, up: false, q: Promise.resolve(), swept: false,
+                 state: 'kapali', error: null };
+    const set = (state, error) => {
+        st.state = state;
+        if (error !== undefined) st.error = error;
+        if (onChange) onChange();
+    };
 
     async function proxyFor(iface) {
-        // iDrive 7's oap-sdk takes the timeout as a plain number; { timeoutMs } times out
-        // at once there (car-apps issue #37)
-        return signals.proxy(iface, '1', 5000);
+        const p = await signals.proxy(iface, '1');
+        let avail = false;
+        await new Promise((res) => {
+            const t = setTimeout(res, 5000);
+            Promise.resolve(signals.onAvailable(p, (a) => { if (a) { avail = true; clearTimeout(t); res(); } }))
+                .catch(() => {});
+        });
+        if (!avail) log.warn('car audio: ' + iface + ' not available after 5 s, trying anyway');
+        return p;
     }
     const setAvailable = (on) => signals.call(st.routing, 'hookSourceAvailablityStatusChange', {
         sourceID: AM_SRC,
         availability: { availability: on ? 'A_AVAILABLE' : 'A_UNAVAILABLE', availabilityReason: 0 },
-    }).then(() => log.info('car audio: source ' + (on ? 'available' : 'unavailable')),
-            (e) => log.warn('car audio availability: ' + e));
+    }).then(() => log.info('car audio: source ' + (on ? 'available' : 'unavailable')));
 
+    async function list() {
+        return connectionsOf(await signals.call(st.cmd, 'getListMainConnections', {}));
+    }
     async function sweep() {
         const r = await signals.call(st.cmd, 'getListMainConnections', {});
-        if (!st.swept) { st.swept = true; log.info('car audio connections: ' + JSON.stringify(r).slice(0, 400)); }
-        const list = Array.isArray(r) ? r : (r && Object.values(r).find(Array.isArray)) || [];
-        for (const c of list.filter((c) => c && c.sourceID === AM_SRC)) {
+        if (!st.swept) { st.swept = true; log.info('car audio connections: ' + JSON.stringify(r).slice(0, 600)); }
+        for (const c of connectionsOf(r).filter((c) => c && c.sourceID === AM_SRC)) {
             log.info('car audio: clearing leftover ' + c.mainConnectionID);
             await signals.call(st.cmd, 'disconnect', { mainConnectionID: c.mainConnectionID }).catch(() => {});
         }
     }
     async function ensure() {
         if (st.cmd && st.routing) return;
-        st.cmd = await proxyFor(AM_IFACE);
-        st.routing = await proxyFor(AMR_IFACE);
+        set('proxy');
+        try {
+            st.cmd = await proxyFor(AM_IFACE);
+            st.routing = await proxyFor(AMR_IFACE);
+        } catch (e) {
+            st.cmd = st.routing = null;
+            throw e;
+        }
         await sweep().catch((e) => log.warn('car audio sweep: ' + e));
-        await setAvailable(false);
+        await setAvailable(false).catch((e) => log.warn('car audio availability: ' + e));
+    }
+    async function waitConnected() {
+        const until = Date.now() + CONNECTED_WAIT_MS;
+        let last = null;
+        while (Date.now() < until) {
+            const c = (await list().catch(() => [])).find((c) => c && c.sourceID === AM_SRC
+                && (st.id == null || c.mainConnectionID === st.id));
+            last = c ? c.connectionState : 'none';
+            if (isConnected(c)) return { ok: true, state: last };
+            await new Promise((r) => setTimeout(r, 100));
+        }
+        return { ok: false, state: last };
     }
 
     return {
+        /** resolves once the route is connected (or has given up; the sound is tried anyway) */
         up() {
             st.q = st.q.then(async () => {
                 if (st.up) return;
+                const t0 = Date.now();
                 await ensure();
+                set('baglaniyor');
                 await setAvailable(true);
                 const r = await signals.call(st.cmd, 'connect', { sourceID: AM_SRC, sinkID: AM_SINK });
                 const ok = r && (r.amError === 'E_OK' || r.amError === 'E_ALREADY_EXISTS' || r.amError === 0);
-                st.id = ok && r.mainConnectionID != null ? r.mainConnectionID : null;
-                st.up = !!ok;
-                log.info('car audio: connect ' + (ok ? 'ok id=' + st.id : 'REFUSED ' + JSON.stringify(r)));
-            }).catch((e) => log.warn('car audio up: ' + e));
+                if (!ok) {
+                    log.warn('car audio: connect REFUSED ' + JSON.stringify(r));
+                    set('RED', 'connect: ' + JSON.stringify(r).slice(0, 80));
+                    await setAvailable(false).catch(() => {});
+                    return;
+                }
+                st.id = r.mainConnectionID != null ? r.mainConnectionID : null;
+                st.up = true;
+                const w = await waitConnected();
+                log.info('car audio: connect id=' + st.id + ', ' + w.state + ' after ' + (Date.now() - t0) + ' ms');
+                set(w.ok ? 'bagli' : 'bagli degil', w.ok ? null : 'baglanti ' + w.state);
+            }).catch((e) => {
+                log.warn('car audio up: ' + e);
+                // a failed call leaves nothing worth keeping: start over from the proxies
+                st.cmd = st.routing = null; st.up = false; st.id = null;
+                set('hata', String(e.message || e).slice(0, 80));
+            });
             return st.q;
         },
         down() {
@@ -220,13 +283,30 @@ function CarAudio(signals, log) {
                     await signals.call(st.cmd, 'disconnect', { mainConnectionID: st.id }).catch(() => {});
                     st.id = null;
                 } else await sweep().catch(() => {});
-                await setAvailable(false);
+                await setAvailable(false).catch(() => {});
                 st.up = false;
-            }).catch((e) => log.warn('car audio down: ' + e));
+                set('kapali');
+            }).catch((e) => { st.up = false; log.warn('car audio down: ' + e); set('kapali'); });
             return st.q;
         },
         get isUp() { return st.up; },
+        get state() { return st.state; },
+        get error() { return st.error; },
     };
+}
+
+/** text cut into lines of at most n characters, at spaces where it can */
+function wrap(text, n) {
+    const out = [];
+    let rest = String(text);
+    while (rest.length > n) {
+        let cut = rest.lastIndexOf(' ', n);
+        if (cut < n * 0.5) cut = n;
+        out.push(rest.slice(0, cut).trim());
+        rest = rest.slice(cut).trim();
+    }
+    if (rest) out.push(rest);
+    return out;
 }
 
 /* --------------------------------------------------------------------- app */
@@ -235,18 +315,40 @@ mgu.run({
         const { ui, log, settings } = ctx;
 
         const ctl = Ctl(log);
-        const carAudio = CarAudio(ctx.signals, log);
+        const carAudio = CarAudio(ctx.signals, log, () => render().catch(() => {}));
 
         let effects = [];
         let lastFired = null, lastAt = 0, lastPicked = null;
+        let lastResult = null;           // what the sound service said about the last play
         let routeDownTimer = null;
         let testIdx = 0;
 
-        ctl.onUp = () => ctl.send({ op: 'list' }).then((r) => {
-            effects = (r && r.effects) || [];
-            log.info('effects available: ' + effects.length);
-            render().catch(() => {});
-        });
+        // the device check at every connect: its outcome goes on the screen, so whether this
+        // unit can play at all is visible without a PC
+        let device = null;           // { ok, text }
+        function readProbe(p) {
+            if (!p) return { ok: false, text: 'servis cevap vermedi' };
+            const py = p.python || {};
+            if (p.backend === 'pcm.py') {
+                if (py.ok) return { ok: true, text: 'hazir (pcm.py, ' + (p.device || '') + ')' };
+                const e = py.error || (py.libasound !== 'loaded' && py.libasound) || py.open || py.params || 'bilinmeyen';
+                return { ok: false, text: (py.libasound !== 'loaded' ? 'libasound: ' : py.open ? 'open: ' : py.params ? 'params: ' : '') + e };
+            }
+            return { ok: !/NOT FOUND/.test(p.aplay || ''), text: 'aplay: ' + (p.aplay || '?') + ' (mgu-python yok)' };
+        }
+        ctl.onUp = () => {
+            ctl.send({ op: 'list' }).then((r) => {
+                effects = (r && r.effects) || [];
+                log.info('effects available: ' + effects.length);
+                render().catch(() => {});
+            });
+            device = { ok: null, text: 'kontrol ediliyor' };
+            ctl.send({ op: 'probe' }).then((r) => {
+                device = r && r.error ? { ok: false, text: 'probe: ' + r.error } : readProbe(r && r.probe);
+                log.info('sound device: ' + JSON.stringify(r).slice(0, 1500));
+                render().catch(() => {});
+            });
+        };
         ctl.connect();
 
         /* ---- engine speed: the whole detector ---- */
@@ -257,7 +359,7 @@ mgu.run({
         }, (info) => { fire(info).catch((e) => log.warn('fire: ' + e)); });
 
         const car = Vehicle.watch(ctx, { rpm: true, speed: true, pedal: true }, (what, v) => {
-            if (what === 'rpm') detector.feed(v.rpm);
+            if (what === 'rpm') { detector.feed(v.rpm); prewarm(); }
             else if (what === 'pedal') detector.pedal(v.pedal, true);
         });
         // a pedal that goes quiet hands the decision back to engine speed
@@ -289,14 +391,45 @@ mgu.run({
             return pick;
         }
 
+        // the route is held for a while after a sound and while armed, so the next lift does
+        // not wait for a connect
+        function holdRoute(ms) {
+            clearTimeout(routeDownTimer);
+            routeDownTimer = setTimeout(() => {
+                if (detector.armed) { holdRoute(ROUTE_LINGER_MS); return; }
+                carAudio.down();
+            }, ms);
+        }
+
+        // armed = a lift is coming: bring the route up now, so the sound is on time. A connect
+        // takes up to a second (moonride: "CS_CONNECTED in < 1 s"), a pop is over in less.
+        let prewarmAt = 0;
+        function prewarm() {
+            if (!detector.armed || carAudio.isUp || !settings.get('enabled') || settings.get('prewarm') === false) return;
+            if (settings.get('parkedOnly') && (car.speed === null || car.moving())) return;
+            if (Date.now() - prewarmAt < PREWARM_RETRY_MS) return;
+            prewarmAt = Date.now();
+            carAudio.up().then(() => { if (carAudio.isUp) holdRoute(ROUTE_LINGER_MS); });
+        }
+
         async function play(fx, why) {
             clearTimeout(routeDownTimer);
-            await carAudio.up();
-            const r = await ctl.send({ op: 'play', id: fx.id });
-            if (r && r.error) log.warn('play ' + fx.id + ': ' + r.error);
             lastFired = fx; lastAt = Date.now();
-            routeDownTimer = setTimeout(() => carAudio.down(), (fx.durationMs || 600) + ROUTE_LINGER_MS);
-            log.info('played ' + fx.id + ' (' + why + ')');
+            lastResult = { text: 'rota aciliyor', ok: null };
+            render().catch(() => {});
+            await carAudio.up();
+            lastResult = { text: 'caliyor', ok: null };
+            const r = await ctl.send({ op: 'play', id: fx.id });
+            if (r && r.error) {
+                log.warn('play ' + fx.id + ': ' + r.error);
+                lastResult = { text: r.error, ok: false };
+            } else {
+                log.info('played ' + fx.id + ' (' + why + ') ' + (r.ms || 0) + ' ms via ' + r.backend
+                         + (r.waitedMs ? ', device waited ' + r.waitedMs + ' ms' : ''));
+                lastResult = { text: 'calindi ' + (r.ms || 0) + ' ms (' + r.backend + ')', ok: true };
+            }
+            lastAt = Date.now();
+            holdRoute(ROUTE_LINGER_MS);
             render().catch(() => {});
         }
 
@@ -347,7 +480,7 @@ mgu.run({
                 ['Degisim', Math.round(detector.rate) + ' rpm/s'],
                 ['Tepe', detector.peak ? String(Math.round(detector.peak)) : '-'],
                 ['Efekt', effects.length ? String(effects.length) : 'yok'],
-                ['Ses rotasi', carAudio.isUp ? '287 -> 1024' : 'kapali'],
+                ['Ses rotasi', carAudio.state],
             ];
             rows.forEach((r, i) => {
                 const y = 282 + i * 36;
@@ -369,11 +502,22 @@ mgu.run({
                         1050, 332, 15, t.dim, { align: 'center' });
             }
 
+            // diagnostics on screen: the car has no other place to read them
+            const crit = t.crit || '#ef2b2d';
+            const colour = (ok) => (ok === false ? crit : ok ? t.accent : t.dim);
+            const diag = [];
+            if (ctl.connected && device) diag.push(['Cihaz: ' + device.text, colour(device.ok)]);
+            if (lastResult) diag.push(['Ses: ' + lastResult.text, colour(lastResult.ok)]);
+            if (carAudio.error) diag.push(['Rota: ' + carAudio.error, crit]);
+            const lines = [];
+            diag.forEach((d) => wrap(d[0], 100).slice(0, 2).forEach((l) => lines.push([l, d[1]])));
+            lines.slice(0, 4).forEach((l, i) => cv.text(l[0], 1050, 360 + i * 20, 14, l[1], { align: 'center' }));
+
             const test = effects[testIdx % Math.max(effects.length, 1)];
             cv.text('Dene: ' + (test ? (test.name || test.id) : '-')
                     + '   ·   Efekt: ' + (settings.get('effectMode') === 'random' ? 'rastgele'
                         : settings.get('effectMode') === 'level' ? 'cekise gore' : settings.get('effectMode')),
-                    1050, 430, 15, t.dim, { align: 'center' });
+                    1050, 448, 15, t.dim, { align: 'center' });
 
             if (!ctl.connected) {
                 cv.roundRect(540, 44, 1020, 30, 6, t.crit || '#ef2b2d');

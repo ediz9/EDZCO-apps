@@ -39,13 +39,19 @@ Satırlar: Durum, Değişim, Tepe, Efekt sayısı (20 olmalı), Ses rotası.
 echo '{"op":"probe"}' | nc -U /run/edzco-sound/ctl.sock -q 2
 ```
 
-Üç şeye bak:
+`python` kısmına bak: `libasound: loaded`, `open: ok`, `params: ok` olmalı. Değilse oradaki hata metni sebebi söyler.
 
-- `aplay` var mı
-- `deviceOk: true` mi — yani `plug:smartx:CarLifeMedia_CF_48_STEREO` bu firmware'de var mı
-- `pcms` listesinde CarLifeMedia geçen başka bir ad var mı
+Sonra app'ten dene: **Pop-Bang → Dene**. Sonuç, ekranda "Pop-Bang" panelinin altında yazar:
 
-Sonra app'ten dene: **Pop-Bang → Dene**. Ses gelmezse log'u getir; ses rotasını (AudioManager 287→1024) app kuruyor ve log'a yazıyor.
+| Ekranda | Anlamı |
+|---|---|
+| `Ses: calindi 412 ms (pcm.py)` | Cihaz sesi aldı. Duyulmuyorsa ses seviyesi / kaynak tarafı |
+| `Ses: stall: ... the source is not connected` | Rota bağlanmadı (CarPlay müziği durmadıysa bu) |
+| `Ses: open: ...` / `params: ...` | Cihaz adı bu firmware'de farklı |
+| `Ses: libasound: ...` | libasound bulunamadı |
+| `Rota: ...` | AudioManager hatası |
+
+İlk denemede (0.1.0, aplay ile) rota bağlanıp CarPlay durdu ama ses gelmedi; 0.2.0 sesi moonride gibi doğrudan libasound ile yazıyor.
 
 ---
 

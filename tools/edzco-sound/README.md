@@ -30,17 +30,37 @@ The routing half lives in the **app**, because AudioManager is reached over SOME
 
 The route itself is [moonride](https://github.com/JustAnotherPU/moonride)'s, car-tested on an X5 G05.
 
+### Writing the PCM: pcm.py, not aplay
+
+0.1.0 played through `aplay`. On the G20 (2026-11-24) the route came up (CarPlay paused, the
+media icon showed) but nothing was heard: the PCM side never delivered. The unit is not known
+to carry alsa-utils, and moonride does not use them either: its `audio.cpp` dlopens
+`libasound.so.2` and calls `snd_pcm_open` (nonblocking), `snd_pcm_set_params` (S16_LE,
+interleaved, 2 ch, 48 kHz, 64 ms) and `snd_pcm_writei`.
+
+`pcm.py` makes the same calls through `ctypes`, with the Python the Store installs on every unit
+(`/var/opt/mgu-python/current/bin/python3`, hence `"requires": {"mgu-python": ...}`). It stays
+running; `sound.js` sends it one JSON line per sound. It upmixes mono files, pads the end to whole
+1024-frame periods so the tail is not left in the plugin, and reports `stall` when the device takes
+nothing for 2.5 s: that is a source the AudioManager has not connected. `aplay` is used only when
+that Python is missing.
+
 ## First run on a new car
 
 ```sh
 echo '{"op":"probe"}' | nc -U /run/edzco-sound/ctl.sock -q 2
 ```
 
-Reports whether `aplay` exists, every PCM the unit has (`aplay -L`), and whether the device above is among them. If `CarLifeMedia_CF_48_STEREO` is named differently on your firmware, override it in the unit:
+Reports whether `libasound.so.2` loads and the device opens and takes the parameters (`python`),
+whether `aplay` exists, and `/proc/asound/cards`. The service also writes this to the journal at
+every start. If `CarLifeMedia_CF_48_STEREO` is named differently on your firmware, override it in
+the unit:
 
 ```
-Environment=EDZCO_PCM=plug:smartx:<whatever aplay -L calls it>
+Environment=EDZCO_PCM=plug:smartx:<name>
 ```
+
+`EDZCO_GAIN` (default 1.0) scales the samples.
 
 ## Control socket
 
@@ -52,12 +72,16 @@ Environment=EDZCO_PCM=plug:smartx:<whatever aplay -L calls it>
 -> { "op": "play", "id": "crackle_med" }
 -> { "op": "stop" }
 -> { "op": "probe" }
+-> { "op": "status" }                     the backend and the last play's outcome
 
 <- { "reply": "pong" }
 <- { "effects": [ { "id", "name", "level", "durationMs" } ] }
-<- { "played": "crackle_med", "ms": 994 }
-<- { "probe": { "aplay", "device", "deviceOk", "devices", "pcms" } }
+<- { "played": "crackle_med", "ms": 994, "backend": "pcm.py", "waitedMs": 0 }
+<- { "probe": { "backend", "device", "python": { "libasound", "open", "params" }, "aplay", "cards", "last" } }
+<- { "error": "...", "stage": "libasound|open|params|stall|write|file" }
 ```
+
+A request's `seq` comes back on its reply.
 
 One sound at a time — a second pop stepping on the first reads as a glitch, not as two pops.
 
