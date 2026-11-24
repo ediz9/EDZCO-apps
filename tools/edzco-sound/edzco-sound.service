@@ -10,6 +10,7 @@ ExecStart=/usr/bin/node /var/opt/edzco-sound/current/sound.js
 # the car's system.conf has DefaultStandardOutput=null, so without this the log never
 # reaches the journal
 StandardOutput=journal
+StandardError=journal
 Restart=always
 RestartSec=5
 

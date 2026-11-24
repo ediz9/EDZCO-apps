@@ -48,12 +48,16 @@ Each pattern is a timeline in [patterns.js](patterns.js):
 ```
 -> { "op": "ping" }
 -> { "op": "get" }
--> { "op": "play", "id": "welcome", "parked": true, "engineOn": true }
--> { "op": "lamp", "id": "fog_rear", "on": true }
--> { "op": "lamp_check" }
+-> { "op": "list_patterns" }
+-> { "op": "play", "id": "welcome", "parked": true, "speed": 0 }
+-> { "op": "lamp", "id": "fog_rear", "on": true, "parked": true }
+-> { "op": "lamp_check", "parked": true }
 -> { "op": "stop" }
 
+`lamp` and `lamp_check` light anything, so they are refused without `"parked": true`.
+
 <- { "reply": "pong" }
+<- { "patterns": [{ "id", "name", "description", "group", "parkedOnly", "danger", "maxSpeedKmh", "loop" }] }
 <- { "state": { "connected": bool, "sessionActive": bool, "activePattern": id|null,
                  "layouts": {"bdcOut": "A"|"B"|...|null},
                  "capable": {"drl_l": {"ok": bool, "path": "bdc_out:A"}, ...},

@@ -7,24 +7,29 @@
   "loggingId": "OAEDZ2",
   "iconGlyph": "lights",
   "mguHmi": [
-    "ID7",
-    "ID8"
+    "ID7"
   ],
   "requires": {
-    "edzco-lights": "0.1.0",
-    "mgu-deploy": "0.7.5"
+    "edzco-lights": "0.1.0"
   },
   "signals": {
-    "de.bmw.infotainment.vehicle.CDS": {
-      "_notes": "doors + gear + ignition drive the auto patterns and the parkedOnly gate",
-      "statusDoorDriverFront": "rs",
-      "statusDoorPassengerFront": "rs",
-      "statusDoorDriverRear": "rs",
-      "statusDoorPassengerRear": "rs",
-      "statusGearPosition": "rs",
-      "statusIgnition": "rs",
-      "statusCentralLock": "rs",
-      "statusCarSpeed": "rs"
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "_notes": "road speed: the moving patterns' speed ceilings, and parked when the selector is not sent",
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.infrastructure.VehicleInformation": {
+      "_optional": "parked is judged from road speed instead of the selector",
+      "statusGearboxDrive": "s",
+      "DataPowerTrain2": "s"
+    },
+    "de.bmw.body.DoorsWindowsRoofMirrors": {
+      "_optional": "no welcome pattern when a door opens",
+      "CentralLockingSystemAndPanelStatus": "s"
+    },
+    "de.bmw.infrastructure.VehicleCondition": {
+      "_optional": "no goodbye pattern when the car is locked and left",
+      "VehicleCondition": "s",
+      "vehicleConditionNoCrc": "s"
     }
   },
   "screens": [
@@ -75,5 +80,8 @@
       "type": "bool",
       "default": true
     }
+  ],
+  "shared": [
+    "edzco_vehicle.js"
   ]
 }

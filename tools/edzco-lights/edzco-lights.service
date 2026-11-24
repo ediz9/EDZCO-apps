@@ -7,6 +7,7 @@ After=vsomeipd.service
 # how the lamp functions are written.
 ExecStart=/usr/bin/node /var/opt/edzco-lights/current/lights.js
 StandardOutput=journal
+StandardError=journal
 Restart=always
 RestartSec=5
 

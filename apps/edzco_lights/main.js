@@ -1,198 +1,256 @@
 'use strict';
 /*
- * edzco_lights ("Lights"): front end of the edzco-lights tool.
+ * edzco_lights ("Lights") - flashes the exterior lamps in patterns through the body
+ * controller's own test functions.
  *
- * The app shows three tabs:
- *   Patterns   - cards for Welcome, Goodbye, Comfort Flash, Sequential Chase, Hazard Dance
- *   Freeform   - every learnt lamp as a toggle; Lamp Check button at the top
- *   Settings   - auto-welcome on door open, auto-goodbye on central lock, brightness cap stub
+ * The app decides what should run and draws the screen; the edzco-lights service owns the
+ * diagnostic link and writes the lamp functions. See that tool's README for the UDS.
  *
- * The app enforces the UI gate (parked? ignition? danger confirm?) and forwards flags to the
- * tool; the tool enforces the same flags on its side. The app never does UDS.
+ * Patterns come in two groups:
+ *   show    parked only; free to hold a lamp dark, because nobody reads it as a signal
+ *   moving  may run while driving - only lamps normally off while driving, released
+ *           between every flash, and each with its own speed ceiling
  *
- *   -> { "op": "play", "id": <patternId>, "parked": bool, "engineOn": bool, "danger": bool? }
- *   -> { "op": "lamp", "id": <lampId>, "on": bool }
- *   -> { "op": "lamp_check" }
- *   -> { "op": "stop" }
+ * Piyasa and Wig-Wag use the high beams, so they carry `danger` and need a confirm. That
+ * confirm is a second press on the same card, not a dialog: there is no window.confirm in
+ * this runtime, and a two-press confirm suits the iDrive knob better than a modal anyway.
  *
- * Auto-run: with autoWelcome on, any door opening while parked + engine off fires Welcome.
- * With autoGoodbye on, central-lock going to locked fires Goodbye.
+ * The car's state (selector, road speed, doors, locked-and-left) comes from
+ * shared/edzco_vehicle.js, read and scaled the way the kit's own Car and parked do.
  */
-const fs = require('fs');
 const net = require('net');
-const path = require('path');
-const util = require('util');
+const mgu = require('./kit/mgu');
+const G = require('./kit/gauges');
+const Vehicle = require('./edzco_vehicle');
 
-const LOG = '[edzco_lights]';
 const CTL = process.env.EDZCO_LIGHTS_CTL || '/run/edzco-lights/ctl.sock';
 const RETRY_MS = 2000;
-const POLL_MS = 1000;
-const DATA = process.env.LIGHTS_DATA || path.join('/var', 'opt', 'public', 'oap', 'data');
-const LOG_FILE = path.join(DATA, 'edzco_lights.log');
-const STATE_FILE = path.join(DATA, 'edzco_lights.state.json');
+const W = 1600, H = 520;
+const CONFIRM_MS = 5000;     // a danger arm lapses, so a stray press never leaves one primed
 
-function log() {
-    const line = [new Date().toISOString()].concat([].slice.call(arguments)
-        .map((x) => (typeof x === 'string' ? x : util.inspect(x, { depth: 4 }).slice(0, 2000)))).join(' ');
-    console.error(LOG, line);
-    try { if (fs.statSync(LOG_FILE).size > 256 * 1024) fs.writeFileSync(LOG_FILE, ''); } catch (e) {}
-    try { fs.mkdirSync(DATA, { recursive: true }); fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) {}
-}
-
-function Ctl() {
+/* ------------------------------------------------------------- lights service */
+function Ctl(log) {
     const self = {
-        sock: null, buf: '', pending: [], connected: false, onStateCb: null, onConnectCb: null,
+        sock: null, buf: '', pending: [], connected: false, onUp: null,
         connect() {
             try { self.sock = net.connect(CTL); }
-            catch (e) { log('connect threw', e.message); self.retry(); return; }
-            self.sock.on('connect', () => { self.connected = true; log('connected', CTL); if (self.onConnectCb) self.onConnectCb(true); });
-            self.sock.on('data', (chunk) => {
-                self.buf += chunk.toString('utf8');
+            catch (e) { self.retry(); return; }
+            self.sock.on('connect', () => {
+                self.connected = true;
+                log.info('lights service connected');
+                if (self.onUp) self.onUp();
+            });
+            self.sock.on('data', (c) => {
+                self.buf += c.toString('utf8');
                 let i;
                 while ((i = self.buf.indexOf('\n')) >= 0) {
                     const line = self.buf.slice(0, i).trim();
                     self.buf = self.buf.slice(i + 1);
                     if (!line) continue;
                     let msg;
-                    try { msg = JSON.parse(line); } catch (e) { log('bad json', line); continue; }
-                    const p = self.pending.shift();
-                    if (p) p.cb(msg);
-                    if (msg.state && self.onStateCb) self.onStateCb(msg.state);
+                    try { msg = JSON.parse(line); } catch (e) { continue; }
+                    const cb = self.pending.shift();
+                    if (cb) cb(msg);
                 }
             });
-            self.sock.on('error', (e) => log('socket error', e.message));
+            self.sock.on('error', () => {});
             self.sock.on('close', () => {
                 self.connected = false;
-                if (self.onConnectCb) self.onConnectCb(false);
-                self.pending.splice(0).forEach((p) => p.cb({ error: 'disconnected' }));
+                self.pending.splice(0).forEach((cb) => cb({ error: 'disconnected' }));
                 self.retry();
             });
         },
-        retry() { try { if (self.sock) self.sock.destroy(); } catch (e) {} self.sock = null; setTimeout(() => self.connect(), RETRY_MS); },
-        send(msg, cb) {
-            if (!self.connected || !self.sock) { if (cb) cb({ error: 'not connected' }); return; }
-            if (cb) self.pending.push({ cb });
-            try { self.sock.write(JSON.stringify(msg) + '\n'); } catch (e) { if (cb) cb({ error: 'write failed: ' + e.message }); }
+        retry() {
+            try { if (self.sock) self.sock.destroy(); } catch (e) {}
+            self.sock = null;
+            setTimeout(() => self.connect(), RETRY_MS);
         },
-        onState(cb) { self.onStateCb = cb; },
-        onConnect(cb) { self.onConnectCb = cb; },
+        send(msg) {
+            return new Promise((res) => {
+                if (!self.connected || !self.sock) { res({ error: 'not connected' }); return; }
+                self.pending.push(res);
+                try { self.sock.write(JSON.stringify(msg) + '\n'); }
+                catch (e) { res({ error: String(e.message || e) }); }
+            });
+        },
     };
     return self;
 }
 
-const INIT_SETTINGS = {
-    autoWelcome: true,
-    autoGoodbye: true,
-    confirmDanger: true,
-};
-function loadSettings() {
-    try { return Object.assign({}, INIT_SETTINGS, JSON.parse(fs.readFileSync(STATE_FILE, 'utf8'))); }
-    catch (e) { return Object.assign({}, INIT_SETTINGS); }
-}
-function saveSettings(s) {
-    try { fs.mkdirSync(DATA, { recursive: true }); fs.writeFileSync(STATE_FILE, JSON.stringify(s, null, 2)); }
-    catch (e) { log('save failed', e.message); }
-}
+/* --------------------------------------------------------------------- app */
+mgu.run({
+    async start(ctx) {
+        const { ui, log, settings } = ctx;
+        const ctl = Ctl(log);
 
-function CdsState(onChange) {
-    const s = { gear: null, engine: null, lock: null, speed: null,
-                doors: { fl: false, fr: false, rl: false, rr: false } };
-    const parked = () => s.gear === 'P' || s.gear === 1;
-    const engineOn = () => s.engine === true || s.engine === 1;
-    /** road speed in km/h, or null when the car has not reported one yet. The moving
-     *  patterns refuse on null rather than assuming standstill. */
-    const speed = () => (typeof s.speed === 'number' ? s.speed : null);
-    const anyDoorOpen = () => s.doors.fl || s.doors.fr || s.doors.rl || s.doors.rr;
-    const locked = () => s.lock === 'LOCKED' || s.lock === 1;
-    const update = (k, v) => {
-        const prev = JSON.parse(JSON.stringify(s));
-        s[k] = v;
-        if (onChange) onChange({ s, prev, parked: parked(), engineOn: engineOn(),
-                                 speed: speed(), anyDoorOpen: anyDoorOpen(), locked: locked() });
-    };
-    const updateDoor = (which, v) => {
-        const prev = anyDoorOpen();
-        s.doors[which] = !!v;
-        const now = anyDoorOpen();
-        if (onChange && !prev && now) onChange({ event: 'doorOpen', parked: parked(), engineOn: engineOn() });
-    };
-    return { update, updateDoor, parked, engineOn, speed };
-}
+        let patterns = [];          // from the tool
+        let idx = 0;                // the focused pattern
+        let playing = null;
+        let armedDanger = null, armedAt = 0;
+        let toolState = { connected: false, layouts: { bdcOut: null }, capable: {} };
+        let note = '';
+        let checkRunning = false;
 
-function main() {
-    log('starting');
-    try { fs.mkdirSync(DATA, { recursive: true }); } catch (e) {}
-    const settings = loadSettings();
-    const ctl = Ctl();
-    let toolState = { connected: false, sessionActive: false, activePattern: null, layouts: { bdcOut: null }, capable: {}, lastError: null };
 
-    const cds = CdsState((ev) => {
-        if (ev.event === 'doorOpen' && settings.autoWelcome && ev.parked && !ev.engineOn) {
-            log('auto-welcome on door open');
-            ctl.send({ op: 'play', id: 'welcome', parked: true, engineOn: false }, (m) => { if (m.error) log('autoWelcome error:', m.error); });
+        ctl.onUp = () => {
+            ctl.send({ op: 'list_patterns' }).then((r) => {
+                patterns = (r && r.patterns) || [];
+                log.info('patterns: ' + patterns.length);
+                render().catch(() => {});
+            });
+            poll();
+        };
+        ctl.connect();
+
+        function poll() {
+            ctl.send({ op: 'get' }).then((r) => {
+                if (r && r.state) toolState = Object.assign(toolState, r.state);
+            });
         }
-        if (ev.s && ev.s.lock === 'LOCKED' && ev.prev && ev.prev.lock !== 'LOCKED' && settings.autoGoodbye) {
-            log('auto-goodbye on central lock');
-            ctl.send({ op: 'play', id: 'goodbye', parked: true, engineOn: false }, (m) => { if (m.error) log('autoGoodbye error:', m.error); });
+        setInterval(poll, 1000);
+
+        /* ---- the car: the gates the service checks again on its side ---- */
+        let doorsWere = null, awayWas = null;
+        const car = Vehicle.watch(ctx, { speed: true, gear: true, doors: true, condition: true }, (what, v) => {
+            if (what === 'doors') {
+                // a door opening on a parked car with the ignition off: welcome
+                if (doorsWere === false && v.doorsOpen && settings.get('autoWelcome') && v.parked() && !v.ignition()) {
+                    log.info('auto-welcome on door open');
+                    play(find('welcome'), true).catch(() => {});
+                }
+                doorsWere = v.doorsOpen;
+            } else if (what === 'condition') {
+                // locked and left: goodbye
+                const away = v.away();
+                if (awayWas === false && away && settings.get('autoGoodbye')) {
+                    log.info('auto-goodbye on locked and left');
+                    play(find('goodbye'), true).catch(() => {});
+                }
+                awayWas = away;
+            }
+        });
+
+        const find = (id) => patterns.find((p) => p.id === id);
+
+        /* ---- running a pattern ---- */
+        async function play(p, auto) {
+            if (!p) return;
+            const msg = { op: 'play', id: p.id, parked: car.parked(), speed: car.speed };
+            if (p.danger) msg.danger = true;              // the UI confirmed before calling
+            const r = await ctl.send(msg);
+            if (r && r.error) { note = r.error; log.warn('play ' + p.id + ': ' + r.error); }
+            else { playing = p.id; note = (auto ? 'otomatik: ' : '') + p.name; }
+            render().catch(() => {});
         }
-    });
 
-    ctl.onConnect((up) => { if (up) ctl.send({ op: 'get' }, () => {}); });
-    ctl.onState((st) => { toolState = Object.assign(toolState, st); });
+        async function stop() {
+            await ctl.send({ op: 'stop' });
+            playing = null; note = 'durduruldu';
+            render().catch(() => {});
+        }
 
-    const ui = {
-        listPatterns() {
-            return require('../../tools/edzco-lights/patterns.js').PATTERNS.map((p) => ({
-                id: p.id, name: p.name, description: p.description, parkedOnly: p.parkedOnly, danger: p.danger,
-            }));
-        },
-        getState() { return { tool: toolState, settings: JSON.parse(JSON.stringify(settings)) }; },
-        /** Start a pattern. The tool re-checks every gate on its side, so this forwards the
-         *  car's state truthfully rather than asserting anything. `confirmedDanger` is the
-         *  UI's record that the user acknowledged a high-beam pattern. */
-        play(id, confirmedDanger) {
-            const msg = {
-                op: 'play',
-                id,
-                parked: cds.parked(),
-                engineOn: cds.engineOn(),
-                speed: cds.speed(),
-            };
-            if (confirmedDanger) msg.danger = true;
-            return new Promise((res) => ctl.send(msg, res));
-        },
-        lamp(id, on) { return new Promise((res) => ctl.send({ op: 'lamp', id, on: !!on }, res)); },
-        lampCheck() { return new Promise((res) => ctl.send({ op: 'lamp_check' }, res)); },
-        stop() { return new Promise((res) => ctl.send({ op: 'stop' }, res)); },
-        setSetting(k, v) {
-            if (!(k in INIT_SETTINGS)) return false;
-            settings[k] = v;
-            saveSettings(settings);
-            return true;
-        },
-    };
+        /* ---- buttons, as declared in app.json "screens" ---- */
+        ui.onClick('BTN_PLAY', () => {
+            const p = patterns[idx];
+            if (!p) return render();
+            if (playing === p.id) { stop().catch(() => {}); return render(); }
 
-    const signals = {
-        statusDoorDriverFront:    (v) => cds.updateDoor('fl', v),
-        statusDoorPassengerFront: (v) => cds.updateDoor('fr', v),
-        statusDoorDriverRear:     (v) => cds.updateDoor('rl', v),
-        statusDoorPassengerRear:  (v) => cds.updateDoor('rr', v),
-        statusGearPosition:       (v) => cds.update('gear', v),
-        statusIgnition:           (v) => cds.update('engine', v),
-        statusCentralLock:        (v) => cds.update('lock', v),
-        statusCarSpeed:           (v) => cds.update('speed', v),
-    };
+            // high-beam patterns: a second press on the same one confirms
+            if (p.danger && settings.get('confirmDanger')) {
+                const fresh = armedDanger === p.id && Date.now() - armedAt < CONFIRM_MS;
+                if (!fresh) {
+                    armedDanger = p.id; armedAt = Date.now();
+                    note = 'Selektor kullanir - onaylamak icin tekrar bas';
+                    return render();
+                }
+            }
+            armedDanger = null;
+            play(p, false).catch(() => {});
+            return render();
+        });
 
-    setInterval(() => { if (ctl.connected) ctl.send({ op: 'get' }, () => {}); }, POLL_MS);
-    ctl.connect();
-    log('ready');
-    return { ui, signals };
-}
+        ui.onClick('BTN_PAGE', () => {
+            if (patterns.length) idx = (idx + 1) % patterns.length;
+            armedDanger = null;
+            return render();
+        });
 
-module.exports = { main };
+        ui.onClick('BTN_ACTION', () => {
+            if (checkRunning) return render();
+            if (!car.parked()) { note = 'Lamp check sadece parkta'; return render(); }
+            checkRunning = true;
+            note = 'Lamp check calisiyor (~50 sn)';
+            ctl.send({ op: 'lamp_check', parked: true }).then((r) => {
+                checkRunning = false;
+                if (r && r.state) toolState = Object.assign(toolState, r.state);
+                note = r && r.error ? r.error : 'Lamp check bitti';
+                render().catch(() => {});
+            });
+            return render();
+        });
 
-if (require.main === module) {
-    main();
-    process.on('SIGTERM', () => { log('SIGTERM'); process.exit(0); });
-    process.on('SIGINT', () => { log('SIGINT'); process.exit(0); });
-}
+        ui.onClick('BTN_BACK', () => { stop().catch(() => {}); return render(); });
+
+        /* ---- the screen ---- */
+        function render() {
+            const t = ctx.theme();
+            const cv = ctx.canvas(W, H).clear(t.bg);
+            const p = patterns[idx];
+
+            G.panel(cv, t, 40, 44, 520, 430, 'Patterns');
+            if (!patterns.length) {
+                cv.text(ctl.connected ? 'pattern yok' : 'edzco-lights servisi yok',
+                        300, 240, 18, t.dim, { align: 'center' });
+            } else {
+                const first = Math.max(0, Math.min(idx - 2, patterns.length - 6));
+                patterns.slice(first, first + 6).forEach((q, i) => {
+                    const y = 92 + i * 60, on = (first + i) === idx;
+                    if (on) cv.roundRect(60, y - 20, 480, 52, 6, t.sel || t.accent);
+                    cv.text(q.name, 80, y, 19, on ? '#ffffff' : t.text, { font: on ? 'bold' : null });
+                    const tag = (q.group === 'moving' ? 'HAREKET' : 'PARK')
+                        + (q.maxSpeedKmh ? '  <=' + q.maxSpeedKmh + ' km/h' : '')
+                        + (q.danger ? '  SELEKTOR' : '');
+                    cv.text(tag, 80, y + 22, 13, on ? '#ffffff' : t.dim, { spacing: 1 });
+                    if (playing === q.id) cv.text('>', 520, y, 20, on ? '#ffffff' : t.accent, { align: 'right' });
+                });
+            }
+
+            G.panel(cv, t, 600, 44, 960, 430, p ? p.name : 'Lights');
+            const big = playing ? 'CALIYOR' : (armedDanger ? 'ONAY' : 'HAZIR');
+            cv.text(big, 1080, 160, 56, playing ? t.accent : (armedDanger ? t.warn : t.dim),
+                    { align: 'center', font: 'bold', spacing: 5 });
+            if (p) cv.text(p.description || '', 1080, 206, 16, t.dim, { align: 'center' });
+            if (note) cv.text(note, 1080, 240, 16, armedDanger ? t.warn : t.dim, { align: 'center' });
+
+            // what the car told us about its own lamps
+            const lay = toolState.layouts && toolState.layouts.bdcOut;
+            const good = Object.keys(toolState.capable || {})
+                .filter((k) => toolState.capable[k] && toolState.capable[k].ok).length;
+            const info = [
+                ['Vites', car.stage || (car.parked() ? 'P (duruyor)' : '-')],
+                ['Hiz', car.speed == null ? '-' : Math.round(car.speed) + ' km/h'],
+                ['BDC duzeni', lay || (checkRunning ? '...' : 'bilinmiyor')],
+                ['Cevap veren lamba', good ? String(good) : (checkRunning ? '...' : '-')],
+            ];
+            info.forEach((r, i) => {
+                const x = 660 + (i % 2) * 460, y = 320 + Math.floor(i / 2) * 62;
+                cv.text(r[0], x, y, 14, t.dim, { spacing: 1 });
+                cv.text(r[1], x, y + 26, 22, t.text, { font: 'num' });
+            });
+
+            if (!ctl.connected) {
+                cv.roundRect(600, 44, 960, 30, 6, t.crit || '#ef2b2d');
+                cv.text('edzco-lights servisi yok - Store\'dan Exterior Lights aracini kur',
+                        1080, 65, 16, '#ffffff', { align: 'center', font: 'bold' });
+            }
+
+            return ui.image('MAIN_GFX', cv);
+        }
+
+        ctx.loop('MAIN', 6, render);
+        await render();
+        log.info('ready');
+
+        return { play, stop, patterns: () => patterns };
+    },
+});

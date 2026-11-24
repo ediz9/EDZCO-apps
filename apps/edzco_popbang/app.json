@@ -7,19 +7,23 @@
   "loggingId": "OAEDZ1",
   "iconGlyph": "exhaust",
   "mguHmi": [
-    "ID7",
-    "ID8"
+    "ID7"
   ],
   "requires": {
-    "edzco-sound": "0.1.0",
-    "mgu-deploy": "0.7.5"
+    "edzco-sound": "0.1.0"
   },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
-      "_notes": "engine speed is the whole detector: the derivative of rpm is the lift. gear and road speed are only for the optional parked-only gate.",
-      "statusEngineSpeed2": "rs",
-      "statusGearPosition": "rs",
-      "statusCarSpeed": "rs"
+      "_notes": "engine speed: arms the detector past armRpm and, without a pedal signal, finds the lift from how fast it falls",
+      "statusEngineSpeed2": "rs"
+    },
+    "de.bmw.infotainment.vehicle.Vehicle2": {
+      "_notes": "road speed, for the optional parked-only gate",
+      "statusCarSpeed2": "rs"
+    },
+    "de.bmw.powertrain.AcceleratorPedal": {
+      "_optional": "the lift is found from falling engine speed instead of the pedal",
+      "AngleAcceleratorPedal": "s"
     },
     "org.genivi.am.commandinterface.CommandControl": {
       "_notes": "AudioManager: connect source 287 (SmartX CarLifeMedia, free outside China) to sink 1024 (main speaker) around each effect",
@@ -27,13 +31,15 @@
         "connect",
         "disconnect",
         "getListMainConnections"
-      ]
+      ],
+      "_instances": "1"
     },
     "org.genivi.am.routinginterface.RoutingControlObserver": {
       "_notes": "287 is A_UNAVAILABLE by default and a connect to it hangs in CS_CONNECTING; it has to be marked available here first",
       "_methods": [
         "hookSourceAvailablityStatusChange"
-      ]
+      ],
+      "_instances": "1"
     }
   },
   "screens": [
@@ -159,5 +165,8 @@
       "type": "bool",
       "default": false
     }
+  ],
+  "shared": [
+    "edzco_vehicle.js"
   ]
 }

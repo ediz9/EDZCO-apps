@@ -1,6 +1,6 @@
 # EDZCO-apps
 
-Apps for BMW iDrive 7 / 8 (MGU), installed through the MGU Store.
+Apps for BMW iDrive 7 (MGU), installed through the MGU Store.
 
 - **Pop-Bang** — plays an overrun effect through the car's speakers when you lift off after a rev.
 - **Lights** — flashes the exterior lamps in patterns through the body controller.
@@ -9,10 +9,7 @@ Apps for BMW iDrive 7 / 8 (MGU), installed through the MGU Store.
 
 MGU Store → Settings → Add source → `EDZCO/EDZCO-apps`
 
-## Note
-
-The two tools (`edzco-sound`, `edzco-lights`) install and run as they are. The apps need BMW's
-`oap-sdk`, extracted from your own head unit, before the Store can build them — see
-[kit/build.js](kit/build.js).
+The head unit builds the apps itself with [kit/](kit/) (the MGU App Kit, MIT) and its own
+`oap-sdk`; each app brings its tool (`edzco-sound`, `edzco-lights`) along.
 
 MIT.

@@ -3,18 +3,148 @@
   "kind": "tool",
   "version": "0.1.0",
   "title": "Sound",
-  "description": "The service behind Pop-Bang. Plays short overrun effects into the head unit's CarLifeMedia PCM (plug:smartx:CarLifeMedia_CF_48_STEREO, 48 kHz stereo), which the app routes to the main speaker through the GENIVI AudioManager. Runs as root because an OAP app has no access to the audio devices. Ships ten synthesised effects and a probe command that reports what this head unit actually has for audio.",
+  "description": "The service behind Pop-Bang. Plays short overrun effects into the head unit's CarLifeMedia PCM (plug:smartx:CarLifeMedia_CF_48_STEREO, 48 kHz stereo), which the app routes to the main speaker through the GENIVI AudioManager. Runs as root because an OAP app has no access to the audio devices. Ships twenty effects (ten synthesised, ten recorded) and a probe command that reports what this head unit actually has for audio.",
   "optional": true,
   "uninstallable": true,
-  "mguHmi": ["ID7", "ID8"],
-  "requires": { "mgu-deploy": "0.7.11" },
-  "files": [
-    { "path": "sound.js",  "from": "sound.js",  "mode": "0644" },
-    { "path": "README.md", "from": "README.md", "mode": "0644" },
-    { "path": "sounds",    "from": "sounds",    "mode": "0644", "recursive": true }
+  "mguHmi": [
+    "ID7"
   ],
-  "units": [ { "name": "edzco-sound.service", "from": "edzco-sound.service" } ],
-  "enable": [ { "unit": "edzco-sound.service", "target": "multi-user.target" } ],
-  "recmgr": ["edzco-sound"],
-  "restart": ["edzco-sound.service"]
+  "requires": {
+    "mgu-deploy": "0.7.11"
+  },
+  "files": [
+    {
+      "path": "sound.js",
+      "from": "sound.js",
+      "mode": "0644"
+    },
+    {
+      "path": "README.md",
+      "from": "README.md",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/bang.wav",
+      "from": "sounds/bang.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/bang_tail.wav",
+      "from": "sounds/bang_tail.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/burble_fast.wav",
+      "from": "sounds/burble_fast.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/burble_slow.wav",
+      "from": "sounds/burble_slow.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/crackle_heavy.wav",
+      "from": "sounds/crackle_heavy.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/crackle_light.wav",
+      "from": "sounds/crackle_light.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/crackle_med.wav",
+      "from": "sounds/crackle_med.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/double.wav",
+      "from": "sounds/double.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_15.wav",
+      "from": "sounds/ex_pop_15.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_17.wav",
+      "from": "sounds/ex_pop_17.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_18.wav",
+      "from": "sounds/ex_pop_18.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_19.wav",
+      "from": "sounds/ex_pop_19.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_22.wav",
+      "from": "sounds/ex_pop_22.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_23.wav",
+      "from": "sounds/ex_pop_23.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_24.wav",
+      "from": "sounds/ex_pop_24.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_27.wav",
+      "from": "sounds/ex_pop_27.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_30.wav",
+      "from": "sounds/ex_pop_30.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/ex_pop_33.wav",
+      "from": "sounds/ex_pop_33.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/pop.wav",
+      "from": "sounds/pop.wav",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/sounds.json",
+      "from": "sounds/sounds.json",
+      "mode": "0644"
+    },
+    {
+      "path": "sounds/tick.wav",
+      "from": "sounds/tick.wav",
+      "mode": "0644"
+    }
+  ],
+  "units": [
+    {
+      "name": "edzco-sound.service",
+      "from": "edzco-sound.service"
+    }
+  ],
+  "enable": [
+    {
+      "unit": "edzco-sound.service",
+      "target": "multi-user.target"
+    }
+  ],
+  "recmgr": [
+    "edzco-sound"
+  ],
+  "restart": [
+    "edzco-sound.service"
+  ]
 }

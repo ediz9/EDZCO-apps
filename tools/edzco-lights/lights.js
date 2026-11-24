@@ -5,17 +5,22 @@
  * Drives the car's exterior lamps through BMW's own test functions on the body controller
  * (BDC, 0x40) and the LED headlight modules (FLM, 0x43 / 0x44). Runs patterns from
  * patterns.js over the lamp catalogue in lamps.js. The gateway is reached through hmictl
- * the same way edzco-exhaust reaches the DME.
+ * (the head unit's own diagnostic client).
  *
  * Control socket: /run/edzco-lights/ctl.sock, JSON lines.
  *   -> { "op": "ping" }
  *   -> { "op": "get" }
- *   -> { "op": "play", "id": "<patternId>", "parked": true|false, "engineOn": true|false }
+ *   -> { "op": "list_patterns" }    the patterns the app offers (lamp_check has its own op)
+ *   -> { "op": "play", "id": "<patternId>", "parked": true|false, "speed": <km/h>, "danger": true }
  *   -> { "op": "stop" }
- *   -> { "op": "lamp_check" }       starts the 50 s lamp-check routine; results in state.layouts / state.capable
- *   -> { "op": "lamp", "id": "<lampId>", "on": true|false }    freeform single-lamp toggle
+ *   -> { "op": "lamp_check", "parked": true }    the 50 s lamp-check routine; results in state.layouts / state.capable
+ *   -> { "op": "lamp", "id": "<lampId>", "on": true|false, "parked": true }    one lamp, by hand
+ *
+ *   "parked" is the app's reading of the car (selector in P, or standing still without a
+ *   selector signal). lamp_check and lamp light anything, so they are refused without it.
  *
  *   <- { "reply": "pong" }
+ *   <- { "patterns": [{ "id", "name", "description", "group", "parkedOnly", "danger", "maxSpeedKmh", "loop" }] }
  *   <- { "state": { "connected", "sessionActive", "activePattern", "layouts": {...}, "capable": {...},
  *                   "lastError": null|string } }
  *   <- { "error": "..." }
@@ -67,7 +72,7 @@ function log() {
     try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) {}
 }
 
-// -------- hmictl plumbing (shared with edzco-exhaust / edzco-light) --------
+// -------- hmictl plumbing --------
 function Hmi() {
     const self = {
         proc: null, pendings: [], eventCb: null,
@@ -347,6 +352,13 @@ function handle(sess, msg) {
     if (!msg || typeof msg !== 'object') return Promise.reject(new Error('bad msg'));
     if (msg.op === 'ping') return Promise.resolve({ reply: 'pong' });
     if (msg.op === 'get')  return Promise.resolve({ state: currentState(sess) });
+    if (msg.op === 'list_patterns') {
+        return Promise.resolve({ patterns: PATTERNS.filter((p) => !p.diagnostic).map((p) => ({
+            id: p.id, name: p.name, description: p.description || '', group: p.group,
+            parkedOnly: !!p.parkedOnly, danger: !!p.danger,
+            maxSpeedKmh: p.maxSpeedKmh != null ? p.maxSpeedKmh : null, loop: !!p.loop,
+        })) });
+    }
 
     if (msg.op === 'play') {
         const p = PATTERNS.find((x) => x.id === msg.id);
@@ -378,6 +390,10 @@ function handle(sess, msg) {
     if (msg.op === 'stop') {
         sess.runner.stop();
         return sess.sess.stop().then(() => ({ state: currentState(sess) }));
+    }
+
+    if ((msg.op === 'lamp_check' || msg.op === 'lamp') && !msg.parked) {
+        return Promise.reject(new Error('refused: ' + msg.op + ' needs parked'));
     }
 
     if (msg.op === 'lamp_check') {
