@@ -31,7 +31,7 @@ const CONFIRM_MS = 5000;     // a danger arm lapses, so a stray press never leav
 /* ------------------------------------------------------------- lights service */
 function Ctl(log) {
     const self = {
-        sock: null, buf: '', pending: [], connected: false, onUp: null,
+        sock: null, buf: '', pending: new Map(), seq: 0, connected: false, onUp: null,
         connect() {
             try { self.sock = net.connect(CTL); }
             catch (e) { self.retry(); return; }
@@ -49,14 +49,17 @@ function Ctl(log) {
                     if (!line) continue;
                     let msg;
                     try { msg = JSON.parse(line); } catch (e) { continue; }
-                    const cb = self.pending.shift();
-                    if (cb) cb(msg);
+                    // the service answers requests as they finish, not in order: pair by seq
+                    const cb = self.pending.get(msg.seq);
+                    if (cb) { self.pending.delete(msg.seq); cb(msg); }
                 }
             });
             self.sock.on('error', () => {});
             self.sock.on('close', () => {
                 self.connected = false;
-                self.pending.splice(0).forEach((cb) => cb({ error: 'disconnected' }));
+                const left = Array.from(self.pending.values());
+                self.pending.clear();
+                left.forEach((cb) => cb({ error: 'disconnected' }));
                 self.retry();
             });
         },
@@ -68,9 +71,10 @@ function Ctl(log) {
         send(msg) {
             return new Promise((res) => {
                 if (!self.connected || !self.sock) { res({ error: 'not connected' }); return; }
-                self.pending.push(res);
-                try { self.sock.write(JSON.stringify(msg) + '\n'); }
-                catch (e) { res({ error: String(e.message || e) }); }
+                const seq = ++self.seq;
+                self.pending.set(seq, res);
+                try { self.sock.write(JSON.stringify(Object.assign({}, msg, { seq })) + '\n'); }
+                catch (e) { self.pending.delete(seq); res({ error: String(e.message || e) }); }
             });
         },
     };
@@ -104,7 +108,10 @@ mgu.run({
 
         function poll() {
             ctl.send({ op: 'get' }).then((r) => {
-                if (r && r.state) toolState = Object.assign(toolState, r.state);
+                if (!r || !r.state) return;
+                toolState = Object.assign(toolState, r.state);
+                // the service runs the pattern: a pattern that ended on its own (or never started) is not playing
+                playing = r.state.activePattern || null;
             });
         }
         setInterval(poll, 1000);
@@ -192,7 +199,7 @@ mgu.run({
         ui.onClick('BTN_BACK', () => { stop().catch(() => {}); return render(); });
 
         /* ---- the screen ---- */
-        function render() {
+        async function render() {
             const t = ctx.theme();
             const cv = ctx.canvas(W, H).clear(t.bg);
             const p = patterns[idx];
@@ -204,7 +211,7 @@ mgu.run({
             } else {
                 const first = Math.max(0, Math.min(idx - 2, patterns.length - 6));
                 patterns.slice(first, first + 6).forEach((q, i) => {
-                    const y = 92 + i * 60, on = (first + i) === idx;
+                    const y = 116 + i * 58, on = (first + i) === idx;
                     if (on) cv.roundRect(60, y - 20, 480, 52, 6, t.sel || t.accent);
                     cv.text(q.name, 80, y, 19, on ? '#ffffff' : t.text, { font: on ? 'bold' : null });
                     const tag = (q.group === 'moving' ? 'HAREKET' : 'PARK')

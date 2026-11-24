@@ -7,7 +7,7 @@ Apps for BMW iDrive 7 (MGU), installed through the MGU Store.
 
 ## Install
 
-MGU Store → Settings → Add source → `EDZCO/EDZCO-apps`
+MGU Store → Settings → Add source → `github.com/ediz9/EDZCO-apps/tree/main`
 
 The head unit builds the apps itself with [kit/](kit/) (the MGU App Kit, MIT) and its own
 `oap-sdk`; each app brings its tool (`edzco-sound`, `edzco-lights`) along.

@@ -117,7 +117,7 @@ function OverrunDetector(cfg, onLift) {
 /* -------------------------------------------------------------- sound service */
 function Ctl(log) {
     const self = {
-        sock: null, buf: '', pending: [], connected: false, onUp: null,
+        sock: null, buf: '', pending: new Map(), seq: 0, connected: false, onUp: null,
         connect() {
             try { self.sock = net.connect(CTL); }
             catch (e) { self.retry(); return; }
@@ -135,14 +135,17 @@ function Ctl(log) {
                     if (!line) continue;
                     let msg;
                     try { msg = JSON.parse(line); } catch (e) { continue; }
-                    const cb = self.pending.shift();
-                    if (cb) cb(msg);
+                    // the service answers requests as they finish, not in order: pair by seq
+                    const cb = self.pending.get(msg.seq);
+                    if (cb) { self.pending.delete(msg.seq); cb(msg); }
                 }
             });
             self.sock.on('error', () => {});
             self.sock.on('close', () => {
                 self.connected = false;
-                self.pending.splice(0).forEach((cb) => cb({ error: 'disconnected' }));
+                const left = Array.from(self.pending.values());
+                self.pending.clear();
+                left.forEach((cb) => cb({ error: 'disconnected' }));
                 self.retry();
             });
         },
@@ -154,9 +157,10 @@ function Ctl(log) {
         send(msg) {
             return new Promise((res) => {
                 if (!self.connected || !self.sock) { res({ error: 'not connected' }); return; }
-                self.pending.push(res);
-                try { self.sock.write(JSON.stringify(msg) + '\n'); }
-                catch (e) { res({ error: String(e.message || e) }); }
+                const seq = ++self.seq;
+                self.pending.set(seq, res);
+                try { self.sock.write(JSON.stringify(Object.assign({}, msg, { seq })) + '\n'); }
+                catch (e) { self.pending.delete(seq); res({ error: String(e.message || e) }); }
             });
         },
     };
@@ -321,7 +325,7 @@ mgu.run({
         });
 
         /* ---- the screen ---- */
-        function render() {
+        async function render() {
             const t = ctx.theme();
             const cv = ctx.canvas(W, H).clear(t.bg);
             const on = !!settings.get('enabled');

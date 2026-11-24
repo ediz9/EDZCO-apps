@@ -25,6 +25,9 @@
  *                   "lastError": null|string } }
  *   <- { "error": "..." }
  *
+ *   A request's "seq" (any number) comes back on its reply: requests run concurrently, so
+ *   replies can arrive in another order than the requests.
+ *
  * Safety:
  *   - 10 03 extended session is opened once a request comes in, and 10 01 is sent at the end
  *     (or when stop_all fires). 3E 00 every 2 s while the session is open.
@@ -328,8 +331,11 @@ function serve(sess) {
                 if (!line) continue;
                 let msg;
                 try { msg = JSON.parse(line); } catch (e) { sock.write(JSON.stringify({ error: 'bad json' }) + '\n'); continue; }
-                handle(sess, msg).then((reply) => sock.write(JSON.stringify(reply) + '\n'),
-                                       (err) => sock.write(JSON.stringify({ error: String(err.message || err) }) + '\n'));
+                // requests run concurrently (a play waits for the session, a get does not), so every
+                // reply carries its request's seq and the app pairs them by it, not by order
+                const seq = msg && msg.seq;
+                handle(sess, msg).then((reply) => sock.write(JSON.stringify(Object.assign({ seq }, reply)) + '\n'),
+                                       (err) => sock.write(JSON.stringify({ seq, error: String(err.message || err) }) + '\n'));
             }
         });
         sock.on('error', () => {});

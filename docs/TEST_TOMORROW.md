@@ -2,7 +2,10 @@
 
 ## 1. Store'a kaynak ekle ve kur
 
-Araç ekranından: **MGU Store → Settings → Add source → `EDZCO/EDZCO-apps`**
+Araç ekranından: **MGU Store → Settings → Add source → `github.com/ediz9/EDZCO-apps/tree/main`**
+
+- Repo GitHub'da **public** olmalı (private ise Store GitHub girişi ister).
+- `/tree/main` kanalı `main` dalına sabitler. Sadece `ediz9/EDZCO-apps` da olur, ama repoda bir GitHub Release açılırsa Store paketleri Release'lerde arar ve bulamaz — Release açma.
 
 Listede dört şey görünür:
 

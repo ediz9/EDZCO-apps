@@ -208,9 +208,11 @@ function serve(sess) {
                 let msg;
                 try { msg = JSON.parse(line); }
                 catch (e) { sock.write(JSON.stringify({ error: 'bad json' }) + '\n'); continue; }
+                // requests run concurrently, so every reply carries its request's seq
+                const seq = msg && msg.seq;
                 handle(sess, msg).then(
-                    (reply) => sock.write(JSON.stringify(reply) + '\n'),
-                    (err) => sock.write(JSON.stringify({ error: String(err.message || err) }) + '\n'));
+                    (reply) => sock.write(JSON.stringify(Object.assign({ seq }, reply)) + '\n'),
+                    (err) => sock.write(JSON.stringify({ seq, error: String(err.message || err) }) + '\n'));
             }
         });
         sock.on('error', () => {});

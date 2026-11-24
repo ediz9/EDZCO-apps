@@ -4,7 +4,7 @@
   "description": "Flashes the exterior lamps in patterns through the body controller's own test functions - Welcome and Goodbye around door open and lock, Comfort Flash as an acknowledgement, Sequential Chase and Hazard Dance parked only, plus a Freeform tab with every lamp as a toggle. Includes a Lamp Check routine that learns which path works on each lamp of your car (BDC output, headlight module function or BDC function). Needs the Exterior Lights tool (the Store installs it with the app).",
   "version": "0.1.0",
   "vendor": "edzco",
-  "loggingId": "OAEDZ2",
+  "loggingId": "OAE2",
   "iconGlyph": "lights",
   "mguHmi": [
     "ID7"
