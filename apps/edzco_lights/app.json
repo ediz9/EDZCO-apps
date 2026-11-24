@@ -6,7 +6,10 @@
   "vendor": "edzco",
   "loggingId": "OAEDZ2",
   "iconGlyph": "lights",
-  "mguHmi": ["ID7", "ID8"],
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
   "requires": {
     "edzco-lights": "0.1.0",
     "mgu-deploy": "0.7.5"
@@ -23,5 +26,54 @@
       "statusCentralLock": "rs",
       "statusCarSpeed": "rs"
     }
-  }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Lights",
+      "buttons": [
+        [
+          "BTN_PLAY",
+          "Calistir / durdur"
+        ],
+        [
+          "BTN_PAGE",
+          "Sonraki pattern"
+        ],
+        [
+          "BTN_ACTION",
+          "Lamp check"
+        ],
+        [
+          "BTN_BACK",
+          "Lambalari birak"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Ayarlar"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "autoWelcome",
+      "label": "Kapi acilinca Welcome",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "autoGoodbye",
+      "label": "Kilitlenince Goodbye",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "confirmDanger",
+      "label": "Selektor icin onay",
+      "type": "bool",
+      "default": true
+    }
+  ]
 }

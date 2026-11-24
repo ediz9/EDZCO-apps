@@ -1,27 +1,24 @@
 [Unit]
-Description=EDZCO sound effects service (Pop-Bang)
-Documentation=file:/opt/edzco-sound/README.md
-After=network.target sound.target
-Wants=sound.target
+Description=EDZCO sound effects (Pop-Bang)
+After=vsomeipd.service
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/node /opt/edzco-sound/sound.js
-WorkingDirectory=/opt/edzco-sound
-Restart=on-failure
-RestartSec=3
+# root: an OAP app has no access to the audio devices, so the PCM write happens here.
+# No ProtectSystem/ProtectHome: the working tools on this unit do not use them, and
+# strict mode would cut this service off from /dev/snd.
+ExecStart=/usr/bin/node /var/opt/edzco-sound/current/sound.js
+# the car's system.conf has DefaultStandardOutput=null, so without this the log never
+# reaches the journal
+StandardOutput=journal
+Restart=always
+RestartSec=5
 
-# the PCM the app routes to the speakers; override here if aplay -L names it differently
-Environment=EDZCO_PCM=plug:smartx:CarLifeMedia_CF_48_STEREO
-
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/run/edzco-sound /var/log/edzco-sound
+# the app's control socket; 0666 because the app runs as its own uid
 RuntimeDirectory=edzco-sound
 RuntimeDirectoryMode=0755
-LogsDirectory=edzco-sound
-LogsDirectoryMode=0755
+
+# the PCM the app routes to the speakers; override if aplay -L names it differently
+Environment=EDZCO_PCM=plug:smartx:CarLifeMedia_CF_48_STEREO
 
 [Install]
 WantedBy=multi-user.target

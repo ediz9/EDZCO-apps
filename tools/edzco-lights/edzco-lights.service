@@ -1,24 +1,20 @@
 [Unit]
-Description=EDZCO exterior lights service
-Documentation=file:/opt/edzco-lights/README.md
-After=network.target hmictl.service
-Wants=hmictl.service
+Description=EDZCO exterior lights
+After=vsomeipd.service
 
 [Service]
-Type=simple
-ExecStart=/usr/bin/node /opt/edzco-lights/lights.js
-WorkingDirectory=/opt/edzco-lights
-Restart=on-failure
-RestartSec=3
+# root: the vsomeip policy lets uid 0 reach the diagnostic gateway (TASU 0xF8A6), which is
+# how the lamp functions are written.
+ExecStart=/usr/bin/node /var/opt/edzco-lights/current/lights.js
+StandardOutput=journal
+Restart=always
+RestartSec=5
 
-NoNewPrivileges=yes
-ProtectSystem=strict
-ProtectHome=yes
-ReadWritePaths=/run/edzco-lights /var/log/edzco-lights
 RuntimeDirectory=edzco-lights
 RuntimeDirectoryMode=0755
-LogsDirectory=edzco-lights
-LogsDirectoryMode=0755
+
+# give the release sweep time to hand every lamp back before systemd kills us
+TimeoutStopSec=15s
 
 [Install]
 WantedBy=multi-user.target

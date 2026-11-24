@@ -44,7 +44,7 @@ const util = require('util');
 
 const LOG = '[edzco-sound]';
 const SOCKET = process.env.CTL_SOCKET || '/run/edzco-sound/ctl.sock';
-const LOG_FILE = process.env.SOUND_LOG || '/var/log/edzco-sound/sound.log';
+const LOG_FILE = process.env.SOUND_LOG || '/var/opt/edzco-sound/data/sound.log';
 const SOUND_DIR = process.env.SOUND_DIR || path.join(__dirname, 'sounds');
 // the device moonride uses, car-tested on an X5 G05 (jap-moonride.service)
 const DEVICE = process.env.EDZCO_PCM || 'plug:smartx:CarLifeMedia_CF_48_STEREO';
@@ -54,7 +54,7 @@ const MAX_CONCURRENT_MS = 4000;          // nothing we ship is longer; a guard a
 function log() {
     const line = [new Date().toISOString()].concat([].slice.call(arguments)
         .map((x) => (typeof x === 'string' ? x : util.inspect(x, { depth: 4 }).slice(0, 2000)))).join(' ');
-    console.error(LOG, line);
+    console.error(LOG, line);        // the journal: StandardOutput=journal in the unit
     try { if (fs.statSync(LOG_FILE).size > 256 * 1024) fs.writeFileSync(LOG_FILE, ''); } catch (e) {}
     try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) {}
 }
@@ -219,7 +219,7 @@ function serve(sess) {
 }
 
 function main() {
-    try { fs.mkdirSync('/var/log/edzco-sound', { recursive: true }); } catch (e) {}
+    try { fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true }); } catch (e) {}
     const sess = { effects: loadManifest(), player: Player() };
     log('edzco-sound started', {
         socket: SOCKET, device: DEVICE, soundDir: SOUND_DIR, effects: sess.effects.length,

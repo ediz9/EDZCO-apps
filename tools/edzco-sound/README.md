@@ -78,4 +78,4 @@ They are synthesised, not recorded — see [docs/SOUNDS.md](../../docs/SOUNDS.md
 ## Logs
 
 - `journalctl -u edzco-sound.service -f`
-- `/var/log/edzco-sound/sound.log` (rotated at 256 KB)
+- `/var/opt/edzco-sound/data/sound.log` (rotated at 256 KB)

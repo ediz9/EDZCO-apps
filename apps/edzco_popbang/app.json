@@ -6,7 +6,10 @@
   "vendor": "edzco",
   "loggingId": "OAEDZ1",
   "iconGlyph": "exhaust",
-  "mguHmi": ["ID7", "ID8"],
+  "mguHmi": [
+    "ID7",
+    "ID8"
+  ],
   "requires": {
     "edzco-sound": "0.1.0",
     "mgu-deploy": "0.7.5"
@@ -20,11 +23,141 @@
     },
     "org.genivi.am.commandinterface.CommandControl": {
       "_notes": "AudioManager: connect source 287 (SmartX CarLifeMedia, free outside China) to sink 1024 (main speaker) around each effect",
-      "_methods": ["connect", "disconnect", "getListMainConnections"]
+      "_methods": [
+        "connect",
+        "disconnect",
+        "getListMainConnections"
+      ]
     },
     "org.genivi.am.routinginterface.RoutingControlObserver": {
       "_notes": "287 is A_UNAVAILABLE by default and a connect to it hangs in CS_CONNECTING; it has to be marked available here first",
-      "_methods": ["hookSourceAvailablityStatusChange"]
+      "_methods": [
+        "hookSourceAvailablityStatusChange"
+      ]
     }
-  }
+  },
+  "screens": [
+    {
+      "name": "MAIN",
+      "kind": "canvas",
+      "title": "Pop-Bang",
+      "buttons": [
+        [
+          "BTN_ACTION",
+          "Ac / Kapat"
+        ],
+        [
+          "BTN_PLAY",
+          "Dene"
+        ],
+        [
+          "BTN_PAGE",
+          "Sonraki efekt"
+        ],
+        [
+          "BTN_SETTINGS",
+          "Ayarlar"
+        ]
+      ]
+    }
+  ],
+  "settings": [
+    {
+      "key": "enabled",
+      "label": "Pop-Bang",
+      "type": "bool",
+      "default": true
+    },
+    {
+      "key": "armRpm",
+      "label": "Kurulma deviri",
+      "type": "number",
+      "unit": "rpm",
+      "default": 3000,
+      "steps": [
+        2000,
+        2500,
+        3000,
+        3500,
+        4000,
+        4500,
+        5000
+      ],
+      "markDefault": true
+    },
+    {
+      "key": "dropRpmPerSec",
+      "label": "Hassasiyet",
+      "type": "choice",
+      "default": 1400,
+      "options": [
+        [
+          800,
+          "Hassas"
+        ],
+        [
+          1400,
+          "Normal"
+        ],
+        [
+          2200,
+          "Gec"
+        ],
+        [
+          3000,
+          "Cok gec"
+        ]
+      ]
+    },
+    {
+      "key": "cooldownMs",
+      "label": "Bekleme",
+      "type": "choice",
+      "default": 2000,
+      "options": [
+        [
+          500,
+          "0.5 s"
+        ],
+        [
+          1000,
+          "1 s"
+        ],
+        [
+          2000,
+          "2 s"
+        ],
+        [
+          3000,
+          "3 s"
+        ],
+        [
+          5000,
+          "5 s"
+        ]
+      ]
+    },
+    {
+      "key": "effectMode",
+      "label": "Efekt",
+      "type": "choice",
+      "default": "random",
+      "options": [
+        [
+          "random",
+          "Rastgele"
+        ],
+        [
+          "level",
+          "Cekise gore"
+        ]
+      ]
+    },
+    {
+      "key": "parkedOnly",
+      "label": "Sadece park halinde",
+      "type": "bool",
+      "default": false
+    }
+  ]
 }

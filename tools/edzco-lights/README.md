@@ -63,7 +63,7 @@ Each pattern is a timeline in [patterns.js](patterns.js):
 ## Install (dev loop)
 
 ```sh
-rsync -av tools/edzco-lights/ root@<car>:/opt/edzco-lights/
+rsync -av tools/edzco-lights/ root@<car>:/var/opt/edzco-lights/current/
 scp tools/edzco-lights/edzco-lights.service root@<car>:/etc/systemd/system/
 ssh root@<car> 'systemctl daemon-reload && systemctl enable --now edzco-lights.service'
 ```

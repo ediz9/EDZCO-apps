@@ -46,7 +46,7 @@ const { PATTERNS } = require('./patterns.js');
 
 const LOG = '[edzco-lights]';
 const SOCKET = process.env.CTL_SOCKET || '/run/edzco-lights/ctl.sock';
-const LOG_FILE = process.env.LIGHTS_LOG || '/var/log/edzco-lights/lights.log';
+const LOG_FILE = process.env.LIGHTS_LOG || '/var/opt/edzco-lights/data/lights.log';
 const HMICTL = process.env.HMICTL || '/usr/bin/hmictl';
 
 const DID_BDC_OUT    = [0xE3, 0xB5];      // LICHT_AUSGANG_DIGITAL_STEUERN
@@ -62,7 +62,7 @@ const EXT_SESSION = 0x03;
 function log() {
     const line = [new Date().toISOString()].concat([].slice.call(arguments)
         .map((x) => (typeof x === 'string' ? x : util.inspect(x, { depth: 4 }).slice(0, 2000)))).join(' ');
-    console.error(LOG, line);
+    console.error(LOG, line);        // the journal: StandardOutput=journal in the unit
     try { if (fs.statSync(LOG_FILE).size > 256 * 1024) fs.writeFileSync(LOG_FILE, ''); } catch (e) {}
     try { fs.appendFileSync(LOG_FILE, line + '\n'); } catch (e) {}
 }
@@ -396,7 +396,7 @@ function handle(sess, msg) {
 
 // -------- start -----------------------------------------------------------
 function main() {
-    try { fs.mkdirSync('/var/log/edzco-lights', { recursive: true }); } catch (e) {}
+    try { fs.mkdirSync(path.dirname(LOG_FILE), { recursive: true }); } catch (e) {}
     const hmi = Hmi();
     const uds = new Uds((line) => hmi.call(line), log);
     hmi.onEvent((hex) => uds.onEvent(hex));
