@@ -10,6 +10,11 @@
       "y": 61.38,
       "visible": true
     },
+    "high_beam_l": {
+      "x": 29.11,
+      "y": 58.49,
+      "visible": true
+    },
     "fog_front_l": {
       "x": 33.83,
       "y": 68.43,
@@ -23,6 +28,11 @@
     "turn_fr": {
       "x": 16.45,
       "y": 56.83,
+      "visible": true
+    },
+    "high_beam_r": {
+      "x": 23.47,
+      "y": 57.26,
       "visible": true
     },
     "fog_front_r": {
@@ -77,6 +87,11 @@
       "y": 45.25,
       "visible": false
     },
+    "high_beam_l": {
+      "x": 62.3,
+      "y": 45.19,
+      "visible": false
+    },
     "fog_front_l": {
       "x": 58.74,
       "y": 49.98,
@@ -91,6 +106,11 @@
       "x": 73.07,
       "y": 46.81,
       "visible": true
+    },
+    "high_beam_r": {
+      "x": 66.85,
+      "y": 45.61,
+      "visible": false
     },
     "fog_front_r": {
       "x": 71.03,

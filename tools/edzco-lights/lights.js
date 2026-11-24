@@ -137,36 +137,54 @@ function Session(uds) {
 // -------- lamp output drive ----------------------------------------------
 // With a learnt layout, BDC output = 0xE3B5 + layout(out, on). Without, fall back to the
 // lamp's FLM function (per side) or the BDC function (both sides unless side-specific).
-async function driveLamp(sess, lamp, on) {
+//
+// `state` is one of:
+//   'on'       light it and hold it (the ECU still self-times, so patterns refresh)
+//   'off'      hold it dark - we keep the output, so the car cannot light it either
+//   'release'  hand the output back to the ECU; the car owns the lamp again at once
+//
+// 'off' and 'release' look the same from outside on a parked car, but they are not the
+// same thing while driving: after 'off' the driver's own indicator stalk does nothing,
+// after 'release' everything behaves normally. Moving patterns must use 'release'.
+async function driveLamp(sess, lamp, state) {
     if (!lamp) return { ok: false, reason: 'no such lamp' };
+    if (state === true) state = 'on';
+    if (state === false) state = 'off';
+    const on = state === 'on';
+    const release = state === 'release';
     const layout = sess.layouts.bdcOut;
 
-    // 1) BDC output, if the lamp has one AND we have a learnt layout
+    // 1) BDC output, if the lamp has one AND we have a learnt layout.
+    //    Return-control is its own request shape: 2F E3B5 00 <output>.
     if (lamp.out != null && layout) {
         const row = LAYOUTS.find((l) => l.id === layout);
-        const data = DID_BDC_OUT.concat(row.build(lamp.out, on ? 1 : 0));
+        const data = release
+            ? DID_BDC_OUT.concat([0x00, lamp.out])
+            : DID_BDC_OUT.concat(row.build(lamp.out, on ? 1 : 0));
         try {
             await sess.uds.send(BDC, 0x2F, data, 1500);
-            return { ok: true, path: 'bdc_out:' + layout };
+            return { ok: true, path: 'bdc_out:' + layout, state };
         } catch (e) { /* fall through */ }
     }
 
-    // 2) FLM function (one side, a few lamps have one)
+    // 2) FLM function (one side, a few lamps have one). A function written with 0 seconds
+    //    expires immediately, which is the module's own way of handing the lamp back.
     if (lamp.flm) {
         const data = DID_FLM_FUNC.concat([0x00, lamp.flm.fn, on ? LAMP_ON_SECS : 0]);
         try {
             await sess.uds.send(lamp.flm.ecu, 0x2E, data, 1500);
-            return { ok: true, path: 'flm:' + (lamp.flm.ecu === FLM_L ? 'L' : 'R') };
+            return { ok: true, path: 'flm:' + (lamp.flm.ecu === FLM_L ? 'L' : 'R'), state };
         } catch (e) { /* fall through */ }
     }
 
-    // 3) BDC function (both sides unless the function row names a side)
+    // 3) BDC function (both sides unless the function row names a side). Same story: a
+    //    time of 0 ends our hold and the car takes the lamp back.
     if (lamp.fn) {
         const time10ms = on ? LAMP_ON_SECS * 100 : 0;
         const data = DID_BDC_FUNC.concat([lamp.fn.hi, lamp.fn.lo, time10ms & 0xFF]);
         try {
             await sess.uds.send(BDC, 0x2E, data, 1500);
-            return { ok: true, path: 'bdc_fn' };
+            return { ok: true, path: 'bdc_fn', state };
         } catch (e) {
             return { ok: false, reason: e.message };
         }
@@ -212,6 +230,9 @@ function PatternRunner(sess) {
     let frameTimer = null;
     let idx = 0;
     let startedAt = 0;
+    // every lamp this run has driven, so the release sweep touches exactly those and not
+    // the whole catalogue
+    const touched = new Set();
 
     async function start(id) {
         const p = PATTERNS.find((x) => x.id === id);
@@ -234,10 +255,14 @@ function PatternRunner(sess) {
         // fire every step whose atMs has passed since last tick
         while (idx < current.steps.length && current.steps[idx].atMs <= elapsed) {
             const step = current.steps[idx++];
+            // 'on' | 'off' | 'release'; anything else is treated as 'off' so an unknown
+            // verb can never leave a lamp lit
+            const state = step.fn === 'on' ? 'on' : step.fn === 'release' ? 'release' : 'off';
             for (const lid of step.lamps) {
                 const lamp = BY_ID[lid];
                 if (!lamp) continue;
-                driveLamp(sess, lamp, step.fn === 'on').catch(() => {});
+                touched.add(lid);
+                driveLamp(sess, lamp, state).catch(() => {});
             }
         }
         if (idx >= current.steps.length) {
@@ -257,11 +282,20 @@ function PatternRunner(sess) {
     }
 
     async function releaseAll() {
-        // touch every lamp with off; safer than relying on the ECU timeout alone
-        for (const lamp of LAMPS) {
-            if (lamp.dangerous) continue;
-            await driveLamp(sess, lamp, false).catch(() => {});
+        // Hand every lamp this run touched back to the car. Two things matter here:
+        //
+        //  - 'release', not 'off': after a pattern the car must own its lamps again, or the
+        //    driver's own indicators and flash-to-pass stay dead until the ECU times out.
+        //  - dangerous lamps are NOT skipped. The `dangerous` flag gates lighting a lamp,
+        //    never releasing one; skipping them here left the high beams lit after a
+        //    high-beam pattern, which is the exact opposite of what the flag is for.
+        const ids = touched.size ? Array.from(touched) : LAMPS.map((l) => l.id);
+        for (const id of ids) {
+            const lamp = BY_ID[id];
+            if (!lamp) continue;
+            await driveLamp(sess, lamp, 'release').catch(() => {});
         }
+        touched.clear();
     }
 
     function stop() {
@@ -317,8 +351,27 @@ function handle(sess, msg) {
     if (msg.op === 'play') {
         const p = PATTERNS.find((x) => x.id === msg.id);
         if (!p) return Promise.reject(new Error('no such pattern: ' + msg.id));
-        if (p.parkedOnly && !msg.parked) return Promise.reject(new Error('refused: pattern needs parked'));
-        if (p.danger && !msg.danger) return Promise.reject(new Error('refused: pattern needs explicit danger flag'));
+
+        // show group: parked, full stop
+        if (p.parkedOnly && !msg.parked) {
+            return Promise.reject(new Error('refused: pattern needs parked'));
+        }
+        // moving group: a speed ceiling instead of a parked gate. An unknown speed is
+        // treated as too fast - we would rather refuse than guess, and the app always
+        // has CDS speed when it has anything at all.
+        if (p.maxSpeedKmh != null && !msg.parked) {
+            const v = typeof msg.speed === 'number' ? msg.speed : null;
+            if (v === null) {
+                return Promise.reject(new Error('refused: no road speed from the car'));
+            }
+            if (v > p.maxSpeedKmh) {
+                return Promise.reject(new Error(
+                    `refused: ${Math.round(v)} km/h is over this pattern's ${p.maxSpeedKmh} km/h limit`));
+            }
+        }
+        if (p.danger && !msg.danger) {
+            return Promise.reject(new Error('refused: pattern needs explicit danger flag'));
+        }
         return sess.runner.start(msg.id).then(() => ({ state: currentState(sess) }));
     }
 

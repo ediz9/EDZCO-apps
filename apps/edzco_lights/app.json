@@ -20,7 +20,8 @@
       "statusDoorPassengerRear": "rs",
       "statusGearPosition": "rs",
       "statusIgnition": "rs",
-      "statusCentralLock": "rs"
+      "statusCentralLock": "rs",
+      "statusCarSpeed": "rs"
     }
   }
 }

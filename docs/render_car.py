@@ -468,15 +468,18 @@ def lamp_anchors(meta, V, F, M):
 
     out = {}
     if head_l is not None:
-        # DRL sits along the top of the housing, the indicator lower and outboard
+        # DRL sits along the top of the housing, the indicator lower and outboard, and the
+        # high beam is the inboard projector - so it biases toward the car's centreline
         out["drl_l"] = blend(head_l, z_frac=0.82, x_frac=0.60, y_frac=0.55)
         out["turn_fl"] = blend(head_l, z_frac=0.25, x_frac=0.55, y_frac=0.85)
+        out["high_beam_l"] = blend(head_l, z_frac=0.50, x_frac=0.50, y_frac=0.22)
         # front fog: under the headlight, in the lower bumper (not its own material)
         fl = blend(head_l, z_frac=0.5, x_frac=0.75, y_frac=0.70)
         out["fog_front_l"] = np.array([fl[0] - 0.08, fl[1] * 0.92, 0.40])
     if head_r is not None:
         out["drl_r"] = blend(head_r, z_frac=0.82, x_frac=0.60, y_frac=0.45)
         out["turn_fr"] = blend(head_r, z_frac=0.25, x_frac=0.55, y_frac=0.15)
+        out["high_beam_r"] = blend(head_r, z_frac=0.50, x_frac=0.50, y_frac=0.78)
         fr = blend(head_r, z_frac=0.5, x_frac=0.75, y_frac=0.30)
         out["fog_front_r"] = np.array([fr[0] - 0.08, fr[1] * 0.92, 0.40])
     if tail_l is not None:

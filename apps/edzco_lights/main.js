@@ -95,14 +95,28 @@ function saveSettings(s) {
 }
 
 function CdsState(onChange) {
-    const s = { gear: null, engine: null, lock: null, doors: { fl: false, fr: false, rl: false, rr: false } };
+    const s = { gear: null, engine: null, lock: null, speed: null,
+                doors: { fl: false, fr: false, rl: false, rr: false } };
     const parked = () => s.gear === 'P' || s.gear === 1;
     const engineOn = () => s.engine === true || s.engine === 1;
+    /** road speed in km/h, or null when the car has not reported one yet. The moving
+     *  patterns refuse on null rather than assuming standstill. */
+    const speed = () => (typeof s.speed === 'number' ? s.speed : null);
     const anyDoorOpen = () => s.doors.fl || s.doors.fr || s.doors.rl || s.doors.rr;
     const locked = () => s.lock === 'LOCKED' || s.lock === 1;
-    const update = (k, v) => { const prev = JSON.parse(JSON.stringify(s)); s[k] = v; if (onChange) onChange({ s, prev, parked: parked(), engineOn: engineOn(), anyDoorOpen: anyDoorOpen(), locked: locked() }); };
-    const updateDoor = (which, v) => { const prev = anyDoorOpen(); s.doors[which] = !!v; const now = anyDoorOpen(); if (onChange && !prev && now) onChange({ event: 'doorOpen', parked: parked(), engineOn: engineOn() }); };
-    return { update, updateDoor };
+    const update = (k, v) => {
+        const prev = JSON.parse(JSON.stringify(s));
+        s[k] = v;
+        if (onChange) onChange({ s, prev, parked: parked(), engineOn: engineOn(),
+                                 speed: speed(), anyDoorOpen: anyDoorOpen(), locked: locked() });
+    };
+    const updateDoor = (which, v) => {
+        const prev = anyDoorOpen();
+        s.doors[which] = !!v;
+        const now = anyDoorOpen();
+        if (onChange && !prev && now) onChange({ event: 'doorOpen', parked: parked(), engineOn: engineOn() });
+    };
+    return { update, updateDoor, parked, engineOn, speed };
 }
 
 function main() {
@@ -133,11 +147,18 @@ function main() {
             }));
         },
         getState() { return { tool: toolState, settings: JSON.parse(JSON.stringify(settings)) }; },
-        play(id, needsDangerConfirm) {
-            const parked = true;    // the UI only enables "Play" when CDS says parked
-            const engineOn = false; // not required by most patterns; passed truthfully
-            const msg = { op: 'play', id, parked, engineOn };
-            if (needsDangerConfirm) msg.danger = true;
+        /** Start a pattern. The tool re-checks every gate on its side, so this forwards the
+         *  car's state truthfully rather than asserting anything. `confirmedDanger` is the
+         *  UI's record that the user acknowledged a high-beam pattern. */
+        play(id, confirmedDanger) {
+            const msg = {
+                op: 'play',
+                id,
+                parked: cds.parked(),
+                engineOn: cds.engineOn(),
+                speed: cds.speed(),
+            };
+            if (confirmedDanger) msg.danger = true;
             return new Promise((res) => ctl.send(msg, res));
         },
         lamp(id, on) { return new Promise((res) => ctl.send({ op: 'lamp', id, on: !!on }, res)); },
@@ -159,6 +180,7 @@ function main() {
         statusGearPosition:       (v) => cds.update('gear', v),
         statusIgnition:           (v) => cds.update('engine', v),
         statusCentralLock:        (v) => cds.update('lock', v),
+        statusCarSpeed:           (v) => cds.update('speed', v),
     };
 
     setInterval(() => { if (ctl.connected) ctl.send({ op: 'get' }, () => {}); }, POLL_MS);
