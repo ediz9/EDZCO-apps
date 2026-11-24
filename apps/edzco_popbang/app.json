@@ -1,25 +1,30 @@
 {
   "id": "edzco_popbang",
   "title": "Pop-Bang",
-  "description": "Hold the button, the exhaust valve opens. Release, it closes. The service closes it after 3 s of held-open regardless. Works only when parked and the engine is on. Needs the Exhaust tool (the Store installs it with the app). You fill in your DME's DID and payload in the tool's config before using it; without that, it refuses to write.",
-  "version": "0.1.0",
+  "description": "Plays an overrun effect through the car's speakers the moment you lift off after a rev - when a real exhaust crackles. Watches engine speed and fires on the lift, picking a harder effect the higher the revs were and the faster they fall. Ten effects, from a couple of ticks to a bang with a tail. Nothing is written to the engine: no valve is moved, no coding changes, the exhaust does exactly what it always does. Needs the Sound tool (the Store installs it with the app).",
+  "version": "0.2.0",
   "vendor": "edzco",
   "loggingId": "OAEDZ1",
   "iconGlyph": "exhaust",
   "mguHmi": ["ID7", "ID8"],
   "requires": {
-    "edzco-exhaust": "0.1.0",
+    "edzco-sound": "0.1.0",
     "mgu-deploy": "0.7.5"
   },
   "signals": {
     "de.bmw.infotainment.vehicle.CDS": {
-      "_notes": "parking state + engine state live here; the app forwards both to the tool with every hold op so the tool can enforce safety on its side too",
+      "_notes": "engine speed is the whole detector: the derivative of rpm is the lift. gear and road speed are only for the optional parked-only gate.",
+      "statusEngineSpeed2": "rs",
       "statusGearPosition": "rs",
-      "statusEngineRunning": "rs",
       "statusCarSpeed": "rs"
     },
-    "de.bmw.infotainment.telematic.oap.AppStart": {
-      "statusApplicationStarted": "rs"
+    "org.genivi.am.commandinterface.CommandControl": {
+      "_notes": "AudioManager: connect source 287 (SmartX CarLifeMedia, free outside China) to sink 1024 (main speaker) around each effect",
+      "_methods": ["connect", "disconnect", "getListMainConnections"]
+    },
+    "org.genivi.am.routinginterface.RoutingControlObserver": {
+      "_notes": "287 is A_UNAVAILABLE by default and a connect to it hangs in CS_CONNECTING; it has to be marked available here first",
+      "_methods": ["hookSourceAvailablityStatusChange"]
     }
   }
 }

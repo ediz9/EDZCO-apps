@@ -1,0 +1,20 @@
+{
+  "id": "edzco-sound",
+  "kind": "tool",
+  "version": "0.1.0",
+  "title": "Sound",
+  "description": "The service behind Pop-Bang. Plays short overrun effects into the head unit's CarLifeMedia PCM (plug:smartx:CarLifeMedia_CF_48_STEREO, 48 kHz stereo), which the app routes to the main speaker through the GENIVI AudioManager. Runs as root because an OAP app has no access to the audio devices. Ships ten synthesised effects and a probe command that reports what this head unit actually has for audio.",
+  "optional": true,
+  "uninstallable": true,
+  "mguHmi": ["ID7", "ID8"],
+  "requires": { "mgu-deploy": "0.7.11" },
+  "files": [
+    { "path": "sound.js",  "from": "sound.js",  "mode": "0644" },
+    { "path": "README.md", "from": "README.md", "mode": "0644" },
+    { "path": "sounds",    "from": "sounds",    "mode": "0644", "recursive": true }
+  ],
+  "units": [ { "name": "edzco-sound.service", "from": "edzco-sound.service" } ],
+  "enable": [ { "unit": "edzco-sound.service", "target": "multi-user.target" } ],
+  "recmgr": ["edzco-sound"],
+  "restart": ["edzco-sound.service"]
+}

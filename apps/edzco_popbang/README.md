@@ -1,47 +1,62 @@
 # Pop-Bang
 
-Hold the button on the central display, the exhaust valve opens. Release, it closes. Works only when the car is parked and the engine is on. A watchdog closes the valve after 3 s of held-open regardless.
+Plays an overrun effect through the car's speakers the moment you lift off after a rev — when a real exhaust crackles.
 
-Version 0.1.0 · iDrive 7 and 8 · package `edzco_popbang` · needs the `edzco-exhaust` tool (installed with the app).
+Version 0.2.0 · iDrive 7 and 8 · package `edzco_popbang` · needs the `edzco-sound` tool (installed with the app).
 
-> [!WARNING]
-> **Not car-tested yet.** The DME DID and payload row that tell the tool what to write live in [../../tools/edzco-exhaust/config.json](../../tools/edzco-exhaust/config.json). The row shipped is a placeholder. You fill it from your own research against your own car's CAFD — the tool refuses to write anything without a filled-in row. See [docs/POPBANG_RESEARCH.md](../../docs/POPBANG_RESEARCH.md).
+> [!IMPORTANT]
+> **Nothing is written to the engine.** No valve is moved, no DME request is sent, no coding changes. Your exhaust does exactly what it always does; this adds a sound on top of it, through the head unit's audio, at the right instant.
 
-## How it works
+## How it decides to fire
 
-- The UI is one page: a big HOLD button in the middle, three state dots at the top (engine running, parked, tool connected) and a short log strip at the bottom.
-- The app talks to the `edzco-exhaust` tool over `/run/edzco-exhaust/ctl.sock` in JSON lines. It does **not** do UDS itself.
-- Every hold sends `{ op: "popbang", hold: true, parked, engineOn }` the instant the touch starts; release sends the same with `hold: false`. The tool handles the UDS.
-- If the user lets go, the app leaves the page, the socket drops, or 3 s go by — the tool closes the flap. Three layers, any one of them is enough.
+The one signal every car publishes is engine speed. That turns out to be enough, because the derivative of rpm measures the thing we actually care about more directly than a pedal position would: **the throttle shutting is rpm falling.**
 
-## Safety
-
-- The app refuses to start a hold unless CDS reports parked **and** engine on.
-- The tool refuses to write unless the app includes both flags true in the message, and `tools/edzco-exhaust/config.json → safety.require_parked` and `.require_engine_on` are on (they are on by default).
-- The tool's watchdog closes the valve after `safety.hold_max_ms` regardless (default 3000 ms).
-
-Nothing in Pop-Bang changes car coding or writes anything that survives a shutdown.
-
-## What the DME row looks like
-
-Edit `tools/edzco-exhaust/config.json`:
-
-```json
-{
-  "ecus": {
-    "DME_B58": {
-      "target_hex": "0x12",
-      "popbang_open":  { "sid_hex": "0x2F", "did_hex": "0xXXXX", "payload_hex": "03" },
-      "popbang_close": { "sid_hex": "0x2F", "did_hex": "0xXXXX", "payload_hex": "00" }
-    }
-  }
-}
+```
+ARMED     rpm climbs past armRpm            you revved it
+FIRE      rpm then falls faster than        you lifted
+          dropRpmPerSec
+COOLDOWN  hold off for cooldownMs           one lift is one effect
 ```
 
-The DME target on G-series cars is 0x12 (verify with your own SGBD). The DID and the payload after it are engine-family specific. See [POPBANG_RESEARCH.md](../../docs/POPBANG_RESEARCH.md) for what to look for (search strings, E-Sys function blocks, candidates known in the community).
+Which effect plays scales with how hard the lift was — peak rpm and how fast it is dropping pick a level 1–5:
+
+| Peak rpm | Level | Typical effect |
+|---|---|---|
+| under 3000 | 1 | `tick`, `pop` |
+| 3000–4000 | 2 | `double`, `crackle_light` |
+| 4000–5200 | 3 | `crackle_med`, `burble_fast` |
+| 5200–6200 | 4 | `crackle_heavy`, `bang` |
+| 6200+ | 5 | `bang_tail` |
+
+A drop faster than 2600 rpm/s pushes it up one more level.
 
 ## Settings
 
-None yet. The next version adds:
-- preferred engine family (so the tool picks the right row without reading `vehicle.statusVehiclePartType` every tick)
-- "quick blip" mode: open + close itself after 300 ms, for a single pop without holding
+| | Default | |
+|---|---|---|
+| `armRpm` | 3200 | How far you have to rev before a lift counts. Lower it to make it eager. |
+| `dropRpmPerSec` | 1400 | How fast rpm must fall to read as a lift rather than a coast. |
+| `cooldownMs` | 2500 | Minimum gap between two effects. |
+| `effectSet` | `auto` | `auto` picks by level; or pin one effect id. |
+| `parkedOnly` | off | The point is doing it while driving, so this is off. |
+
+The defaults are deliberately lazy: a lift from 3000 rpm dropping at 900 rpm/s is an ordinary gear change, and nobody wants an effect on every shift.
+
+## The sound path
+
+The effect goes out through the head unit's own audio, as a routed source:
+
+- source **287** (SmartX `CarLifeMedia` — China-only, so free on our cars) → sink **1024** (main speaker)
+- PCM `plug:smartx:CarLifeMedia_CF_48_STEREO`
+
+The app brings that route up around each effect and drops it after; the `edzco-sound` service writes the PCM. See the [tool's README](../../tools/edzco-sound/README.md) for why that split exists and for the probe to run on a new car.
+
+## The effects
+
+Ten, synthesised rather than recorded — see [docs/SOUNDS.md](../../docs/SOUNDS.md) for the licensing survey, why a real overrun is not one bang, and how to drop your own recordings in.
+
+## What is not tested yet
+
+- The AudioManager route on **this** car. It is moonride's, car-tested on an X5 G05; a 3 Series may name the PCM differently. Run the tool's `probe` first.
+- Whether the car ducks or stops the media source while the effect plays, and how that feels mid-song.
+- The detector thresholds against real driving. The numbers above are reasoned, not measured — expect to tune `armRpm` and `dropRpmPerSec` after the first drive.

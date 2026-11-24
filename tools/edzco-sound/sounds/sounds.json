@@ -1,0 +1,176 @@
+{
+  "sampleRate": 48000,
+  "channels": 2,
+  "effects": [
+    {
+      "id": "tick",
+      "name": "Tick",
+      "level": 1,
+      "note": "Two soft ticks. A gentle lift at low revs.",
+      "file": "tick.wav",
+      "durationMs": 397
+    },
+    {
+      "id": "pop",
+      "name": "Pop",
+      "level": 1,
+      "note": "One clean report.",
+      "file": "pop.wav",
+      "durationMs": 273
+    },
+    {
+      "id": "double",
+      "name": "Double",
+      "level": 2,
+      "note": "Two, the second deeper - how a real pair lands.",
+      "file": "double.wav",
+      "durationMs": 500
+    },
+    {
+      "id": "crackle_light",
+      "name": "Crackle \u00b7 Light",
+      "level": 2,
+      "note": "A short stutter, bright and thin.",
+      "file": "crackle_light.wav",
+      "durationMs": 634
+    },
+    {
+      "id": "crackle_med",
+      "name": "Crackle \u00b7 Medium",
+      "level": 3,
+      "note": "The everyday overrun: a dozen irregular cracks fading out.",
+      "file": "crackle_med.wav",
+      "durationMs": 994
+    },
+    {
+      "id": "crackle_heavy",
+      "name": "Crackle \u00b7 Heavy",
+      "level": 4,
+      "note": "Long and busy, the way a tuned car carries on after the lift.",
+      "file": "crackle_heavy.wav",
+      "durationMs": 1697
+    },
+    {
+      "id": "burble_slow",
+      "name": "Burble \u00b7 Slow",
+      "level": 2,
+      "note": "Low and round, loafing. Less crack, more chest.",
+      "file": "burble_slow.wav",
+      "durationMs": 1092
+    },
+    {
+      "id": "burble_fast",
+      "name": "Burble \u00b7 Fast",
+      "level": 3,
+      "note": "The same depth, closer together.",
+      "file": "burble_fast.wav",
+      "durationMs": 1244
+    },
+    {
+      "id": "bang",
+      "name": "Bang",
+      "level": 4,
+      "note": "One big one. Deep, slow to let go.",
+      "file": "bang.wav",
+      "durationMs": 382
+    },
+    {
+      "id": "bang_tail",
+      "name": "Bang \u00b7 Tail",
+      "level": 5,
+      "note": "A big one, then the small ones falling away behind it.",
+      "file": "bang_tail.wav",
+      "durationMs": 1024
+    },
+    {
+      "id": "ex_pop_30",
+      "name": "Ex Pop 30",
+      "level": 5,
+      "note": "Recorded sample (565 ms, low-end 86%).",
+      "file": "ex_pop_30.wav",
+      "durationMs": 565,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_15",
+      "name": "Ex Pop 15",
+      "level": 5,
+      "note": "Recorded sample (410 ms, low-end 87%).",
+      "file": "ex_pop_15.wav",
+      "durationMs": 410,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_17",
+      "name": "Ex Pop 17",
+      "level": 4,
+      "note": "Recorded sample (376 ms, low-end 95%).",
+      "file": "ex_pop_17.wav",
+      "durationMs": 376,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_27",
+      "name": "Ex Pop 27",
+      "level": 4,
+      "note": "Recorded sample (363 ms, low-end 90%).",
+      "file": "ex_pop_27.wav",
+      "durationMs": 363,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_23",
+      "name": "Ex Pop 23",
+      "level": 3,
+      "note": "Recorded sample (393 ms, low-end 88%).",
+      "file": "ex_pop_23.wav",
+      "durationMs": 393,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_22",
+      "name": "Ex Pop 22",
+      "level": 3,
+      "note": "Recorded sample (345 ms, low-end 90%).",
+      "file": "ex_pop_22.wav",
+      "durationMs": 345,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_33",
+      "name": "Ex Pop 33",
+      "level": 2,
+      "note": "Recorded sample (398 ms, low-end 84%).",
+      "file": "ex_pop_33.wav",
+      "durationMs": 398,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_19",
+      "name": "Ex Pop 19",
+      "level": 2,
+      "note": "Recorded sample (345 ms, low-end 88%).",
+      "file": "ex_pop_19.wav",
+      "durationMs": 345,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_18",
+      "name": "Ex Pop 18",
+      "level": 1,
+      "note": "Recorded sample (410 ms, low-end 85%).",
+      "file": "ex_pop_18.wav",
+      "durationMs": 410,
+      "source": "imported"
+    },
+    {
+      "id": "ex_pop_24",
+      "name": "Ex Pop 24",
+      "level": 1,
+      "note": "Recorded sample (328 ms, low-end 84%).",
+      "file": "ex_pop_24.wav",
+      "durationMs": 328,
+      "source": "imported"
+    }
+  ]
+}
