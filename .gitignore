@@ -21,3 +21,6 @@ __pycache__/
 # runtime data (device-specific)
 data/
 *.sock
+
+# supplied by the head unit at build time (mgu-deploy sdk-donor), never committed
+oap-sdk/

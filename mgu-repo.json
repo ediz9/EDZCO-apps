@@ -4,11 +4,20 @@
     "path": "apps/*",
     "manifest": "app.json",
     "icon": "icon.png",
-    "exclude": ["_template", "wip"],
-    "mguHmi": ["ID7", "ID8"],
+    "exclude": [
+      "_template",
+      "wip"
+    ],
+    "mguHmi": [
+      "ID7",
+      "ID8"
+    ],
     "build": {
-      "node": "kit/build.js",
-      "args": ["{id}"],
+      "python": "kit/tools/build.py",
+      "args": [
+        "{id}"
+      ],
+      "sdk": "oap-sdk",
       "output": "dist/{id}@{version}.tgz"
     }
   },
@@ -20,7 +29,10 @@
       "description": "Plays Pop-Bang's effects into the head unit's CarLifeMedia PCM, which the app routes to the speakers through the AudioManager.",
       "optional": true,
       "uninstallable": true,
-      "mguHmi": ["ID7", "ID8"]
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     },
     {
       "id": "edzco-lights",
@@ -29,7 +41,10 @@
       "description": "Drives the exterior lamps through the body controller's own test functions for the Lights app's patterns.",
       "optional": true,
       "uninstallable": true,
-      "mguHmi": ["ID7", "ID8"]
+      "mguHmi": [
+        "ID7",
+        "ID8"
+      ]
     }
   ]
 }
