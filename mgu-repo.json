@@ -36,17 +36,6 @@
       "mguHmi": [
         "ID7"
       ]
-    },
-    {
-      "id": "edzco-lights",
-      "path": "tools/edzco-lights",
-      "title": "Exterior Lights",
-      "description": "Drives the exterior lamps through the body controller's own test functions for the Lights app's patterns.",
-      "optional": true,
-      "uninstallable": true,
-      "mguHmi": [
-        "ID7"
-      ]
     }
   ]
 }

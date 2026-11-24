@@ -1,17 +1,14 @@
 {
   "id": "edzco_lights",
   "title": "Lights",
-  "description": "Flashes the exterior lamps in patterns through the body controller's own test functions - Welcome and Goodbye around door open and lock, Comfort Flash as an acknowledgement, Sequential Chase and Hazard Dance parked only, plus a Freeform tab with every lamp as a toggle. Includes a Lamp Check routine that learns which path works on each lamp of your car (BDC output, headlight module function or BDC function). Needs the Exterior Lights tool (the Store installs it with the app).",
-  "version": "0.1.0",
+  "description": "Flashes the exterior lamps in patterns (Welcome, Goodbye, Piyasa, Wig-Wag and more) through the body controller's own lamp test functions, over the head unit's diagnostic transport. A lamp check finds which lamps this car lets it drive. Show patterns run parked only; moving ones stop above their speed limit; high-beam ones need a second press. Lamp control after light_show by eroobeeroo (PolyForm Noncommercial).",
+  "version": "0.2.0",
   "vendor": "edzco",
   "loggingId": "OAE2",
   "iconGlyph": "lights",
   "mguHmi": [
     "ID7"
   ],
-  "requires": {
-    "edzco-lights": "0.1.0"
-  },
   "signals": {
     "de.bmw.infotainment.vehicle.Vehicle2": {
       "_notes": "road speed: the moving patterns' speed ceilings, and parked when the selector is not sent",
@@ -30,6 +27,16 @@
       "_optional": "no goodbye pattern when the car is locked and left",
       "VehicleCondition": "s",
       "vehicleConditionNoCrc": "s"
+    },
+    "com.harman.infotainment.systemfunctions.tasu.tasu.InternalTasu": {
+      "_notes": "UDS to the body controller (0x40) and the headlight modules (0x43 / 0x44): the lamp test functions, as light_show and ambient_config do",
+      "_instances": "SystemFunctionsInternalTasuInst1",
+      "_methods": [
+        "sendTasuRequest"
+      ],
+      "_broadcasts": [
+        "sendTasuResponse"
+      ]
     }
   },
   "screens": [
@@ -44,7 +51,7 @@
         ],
         [
           "BTN_PAGE",
-          "Sonraki pattern"
+          "Sonraki desen"
         ],
         [
           "BTN_ACTION",

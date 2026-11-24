@@ -1,37 +1,57 @@
 # Lights
 
-Flashes the car's exterior lamps in patterns through the body controller's own test functions. Covers Welcome, Goodbye, Comfort Flash, Sequential Chase and Hazard Dance, plus a Freeform tab with every lamp as a single toggle.
+Flashes the car's exterior lamps in patterns through the body controller's own lamp test functions.
 
-Version 0.1.0 · iDrive 7 and 8 · package `edzco_lights` · needs the `edzco-lights` tool (installed with the app).
+Version 0.2.0 · iDrive 7 · package `edzco_lights` · no tool needed.
 
-> [!NOTE]
-> **Not car-tested yet.** The lamp catalogue, UDS layouts and routes are those [eroobeeroo/idrive7-apps/light_show](https://github.com/eroobeeroo/idrive7-apps/tree/main/apps/light_show) uses and were car-tested there on a G05 X5 xDrive45e. On your car run **Lamp Check** first (Freeform tab, top button) — it probes each lamp and lights the ones that answered in the UI.
+## How it reaches the lamps
+
+From the app itself, over the head unit's diagnostic transport (`InternalTasu`, [kit/diag.js](../../kit/runtime/diag.js)):
+UDS to the body controller (BDC, 0x40) and the LED headlight modules (FLM, 0x43 / 0x44). This is how
+[light_show](https://github.com/eroobeeroo/idrive7-apps/tree/main/apps/light_show) (car-tested on an X5 G05) and
+idrive7-apps' `ambient_config` (car-tested on a G20's BDC_G05) reach the body controller.
+
+0.1.0 did this in a root tool through `/usr/bin/hmictl`. The head unit has no such program (IterioDev ships its own
+inside its tools), so every request timed out and the lamp check found nothing. The `edzco-lights` tool is gone; if
+it is still installed, remove it in the Store.
+
+## Lamp check (first, parked)
+
+Finds the output request layout the body controller takes, whether its outputs time themselves, then lights each
+lamp for 1.2 s through its headlight module, its own output, or its lamp function, and keeps what worked in
+`data/lamp-check.json`. Patterns leave out lamps that did not work. About a minute. The screen shows each step, each
+lamp's result, and the link's request / reply counts with the last refusal.
 
 ## Patterns
 
-- **Welcome** (5 s, parked-only, auto-fires on door open) — DRL + fog + sequential turn chase.
-- **Goodbye** (3 s, parked-only, auto-fires on central-lock) — DRL double pulse to acknowledge the lock.
-- **Comfort Flash** (2.5 s) — five both-side turn signal flashes. The only pattern that runs while the car can move; the car itself refuses indicators above a few km/h.
-- **Sequential Chase** (loop, 30 s cap, parked-only) — turn signal sweep front-to-back both sides.
-- **Hazard Dance** (10 s, parked-only) — fogs + chase + DRL pulse. Harmless but visible.
+| | Kind | |
+|---|---|---|
+| Welcome | parked, once | daytime lights, fogs, front turn signals in turn, reversing lights. Also on a door opening (setting) |
+| Goodbye | parked, once | daytime lights twice, then the rear lamps. Also on locking and leaving (setting) |
+| Comfort Flash | moving ≤ 90 km/h, once | five four-way flashes |
+| Sequential Chase | parked, 30 s | turn signals round the car |
+| Hazard Dance | parked, once | 10 s of fogs, turn signals, rear fogs |
+| Piyasa | moving ≤ 30 km/h, once, high beams | left pair, right pair, both pair |
+| Wig-Wag | moving ≤ 30 km/h, 15 s, high beams | left / right high beam in turn |
+| Rear Alert | moving ≤ 50 km/h, 20 s | rear fogs pulsing (never the reversing lights while moving) |
 
-### Freeform
-
-Every lamp Lamp Check found a route for is a toggle. Parked, engine off, no interaction needed from CDS beyond "is it parked".
-
-### Lamp Check
-
-The first run on a new car. Walks every lamp for 1.2 s and records which path the body controller took (direct output, headlight module function, or BDC function). Takes ~50 s. The result is stored in the tool and remembered across restarts.
+Tap a pattern to choose it, tap it again (or Calistir / durdur) to run or stop it. High-beam patterns need a second
+press within 5 s.
 
 ## Safety
 
-- The app refuses to start a pattern unless CDS says the gear is in P (`parkedOnly: true` patterns).
-- Dangerous lamps (**high beams**) are off by default and skipped by every pattern. Freeform shows them greyed out unless you explicitly confirm. The UI never arms them on public roads.
-- Brake / tail / plate / number plate lights are in the `KEPT` list — the tool never drives them. The brake pedal works as always.
-- Every UDS write to a lamp asks for ≤2 seconds of lit; the loop refreshes each frame while the pattern runs. Stop the pattern or kill the tool and every lamp returns to the car within the ECU's own timeout.
+- Parked patterns refuse unless the selector is in P (or the car stands still without a selector signal) and stop as
+  soon as the car moves. Moving patterns stop above their ceiling, or when road speed is unknown.
+- Moving patterns use only lamps that are normally off while driving, and give each back to the car between
+  flashes (light_show's `emergency` kind).
+- The brake, tail and number plate lights are never switched (lamps.js `KEPT`).
+- Stop gives every lamp back and ends the session. If the app dies, the body controller drops the session within
+  seconds (no tester present) and every lamp is the car's own again. "Lambalari birak" tries every give-back form on
+  every lamp.
 
-## Attribution
+## Licences
 
-Lamp catalogue, UDS layouts, session plan (10 03 extended + 3E keepalive + 10 01 close), "learn-layout-from-rear-left-turn-signal" probe, and the three fall-back routes (BDC output → FLM function → BDC function) come from [eroobeeroo/idrive7-apps/light_show](https://github.com/eroobeeroo/idrive7-apps/tree/main/apps/light_show) (MIT, Copyright 2026 eroobeeroo).
-
-The pattern timeline runner, the UI tabs, the auto-welcome / auto-goodbye hooks and the state saving are this app's own.
+`lamps.js` and `patterns.js` are light_show's, vendored unchanged, under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.light_show) (Required Notice: Copyright (C) 2026 eroobeeroo). They are
+not covered by this repository's MIT licence, and this app may only be used noncommercially. `main.js` and
+`edzco_patterns.js` are this repository's (MIT).

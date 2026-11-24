@@ -10,6 +10,8 @@ Apps for BMW iDrive 7 (MGU), installed through the MGU Store.
 MGU Store → Settings → Add source → `github.com/ediz9/EDZCO-apps/tree/main`
 
 The head unit builds the apps itself with [kit/](kit/) (the MGU App Kit, MIT) and its own
-`oap-sdk`; each app brings its tool (`edzco-sound`, `edzco-lights`) along.
+`oap-sdk`. Pop-Bang brings its tool (`edzco-sound`) along; Lights needs none.
 
-MIT.
+Lights' lamp control (`apps/edzco_lights/lamps.js`, `patterns.js`) is light_show's by eroobeeroo, under the
+PolyForm Noncommercial License 1.0.0 (see that folder); the rest of the repository is MIT.
+

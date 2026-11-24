@@ -12,8 +12,10 @@ Listede dört şey görünür:
 | | Ne olur |
 |---|---|
 | **Pop-Bang** (app) | Araç kendisi derler (kit + aracın kendi `oap-sdk`'sı), `edzco-sound`'u da beraberinde kurar |
-| **Lights** (app) | Aynı şekilde, `edzco-lights`'ı beraberinde kurar |
-| **Sound** / **Exterior Lights** (tool) | App'lerle gelir; ayrıca kurmana gerek yok |
+| **Lights** (app) | Aynı şekilde derlenir; tool istemez (0.2.0'dan beri lambaları kendisi sürer) |
+| **Sound** (tool) | Pop-Bang ile gelir; ayrıca kurmana gerek yok |
+
+0.1.0'dan kalan **Exterior Lights** tool'u kuruluysa Store'dan kaldır: artık kullanılmıyor.
 
 SDK'yı elle çıkarmak **gerekmiyor** — Store'un updater'ı derleme sırasında aracın kendi SDK'sını veriyor.
 
@@ -28,8 +30,7 @@ App'ler **Installed Apps**'te görünür.
 **Pop-Bang:** sol panelde canlı devir. Motor çalışırken sayı oynamıyorsa sinyal gelmiyor demektir → log'u getir.
 Satırlar: Durum, Değişim, Tepe, Efekt sayısı (20 olmalı), Ses rotası.
 
-**Lights:** solda desen listesi (8 desen), sağ altta Vites / Hız / BDC düzeni.
-Üstte kırmızı "edzco-lights servisi yok" şeridi varsa tool çalışmıyor.
+**Lights:** solda desen listesi (8 desen; dokun = seç, tekrar dokun = çalıştır / durdur), sağda Vites / Hız / BDC düzeni / Çalışan lamba, her lambanın durumu ve en altta teşhis bağlantısı satırı.
 
 ---
 
@@ -57,22 +58,15 @@ Sonra app'ten dene: **Pop-Bang → Dene**. Sonuç, ekranda "Pop-Bang" panelinin 
 
 ## 4. Lamba yolunu doğrula
 
-Araç **P'de, kontak açık** olsun. **Lights → Lamp check** (ya da):
+Araç **P'de, kontak açık** olsun. **Lights → Lamp check**. Yaklaşık 1 dakika sürer; her lambayı 1,2 sn yakar.
 
-```sh
-echo '{"op":"lamp_check","parked":true}' | nc -U /run/edzco-lights/ctl.sock -q 60
-```
+Ekranda:
 
-50 saniye sürer, her lambayı 1.2 sn yakar. Ekranda / çıktıda:
+- **BDC duzeni**: gövde modülünün kabul ettiği çıkış isteği (`03 E A 00` gibi) ya da `yok`
+- **Calisan lamba**: kaç lamba sürülebildi; altta her lambanın yolu: `far modulu` / `cikis` / `fonksiyon` / `yok`
+- En alttaki **Teshis** satırı: istek / ok / red / cevapsız sayıları ve son red. `cevapsiz` artıyor ve `ok` 0 ise gövde modülüne ulaşılamıyor
 
-- `BDC düzeni` (`layouts.bdcOut`) — A/B/C/D/E ya da hiçbiri
-- `Cevap veren lamba` (`capable`) — her lamba hangi yoldan sürülebildi
-
-Tek lamba:
-```sh
-echo '{"op":"lamp","id":"fog_rear","on":true,"parked":true}'  | nc -U /run/edzco-lights/ctl.sock -q 2
-echo '{"op":"lamp","id":"fog_rear","on":false,"parked":true}' | nc -U /run/edzco-lights/ctl.sock -q 2
-```
+Lambalar yanık kalırsa: **Lambalari birak**; olmazsa kontağı kapat-aç.
 
 ---
 
@@ -92,8 +86,8 @@ Log'da `lift: ... by pedal` ya da `by rpm` yazar — hangisinin çalıştığın
 | Belirti | Bak |
 |---|---|
 | App Store'da derlenmiyor | Store'daki hata metni; ekran görüntüsünü getir |
-| Soket cevap vermiyor | `systemctl status edzco-sound` / `edzco-lights` |
-| Log | `journalctl -u edzco-sound -u edzco-lights -n 200` |
+| Soket cevap vermiyor | `systemctl status edzco-sound` |
+| Log | `journalctl -u edzco-sound -n 200` |
 | App log'u | app klasörünün `data/` altında: `find / -name 'edzco_*.log' 2>/dev/null` |
 | Hangi sinyal bu araçta yok | App log'unun başı: `... subscribed` / `... error` satırları |
 | `aplay: command not found` | Bu firmware'de ALSA aracı yok; `probe` çıktısını getir |
@@ -106,5 +100,5 @@ Log'da `lift: ... by pedal` ya da `by rpm` yazar — hangisinin çalıştığın
 
 - `probe` çıktısı
 - Lamp check sonucu (ekran fotoğrafı yeter)
-- `journalctl -u edzco-sound -u edzco-lights -n 200`
+- `journalctl -u edzco-sound -n 200`
 - İki app'in log dosyası
